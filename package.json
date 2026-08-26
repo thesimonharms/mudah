@@ -1,0 +1,28 @@
+{
+  "name": "mudah-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mudah — an ergonomic, animation-rich CLI framework. Speed, sleek design, and developer ergonomics for Node and Bun.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=26"
+  },
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.typecheck.json",
+    "test": "vitest run",
+    "bench": "node tools/bench/run.mjs",
+    "release:prepare": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "hello-cli",
+  "version": "0.1.0",
+  "description": "hello-cli — built with Mudah",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "hello-cli": "./bin/hello-cli.js"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "start": "node bin/hello-cli.js",
+    "dev": "node bin/hello-cli.js dev welcome",
+    "doctor": "node bin/hello-cli.js doctor",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mudah-cli/mudah": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.0"
+  }
+}

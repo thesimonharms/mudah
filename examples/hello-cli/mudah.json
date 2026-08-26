@@ -1,0 +1,9 @@
+{
+  "name": "hello-cli",
+  "version": "0.1.0",
+  "bin": "hello-cli",
+  "description": "hello-cli — built with Mudah",
+  "ui": {
+    "theme": "auto"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@mudah-cli/*": ["./packages/*/src/index.ts"],
+      "@mudah-cli/mudah": ["./packages/mudah/src/index.ts"],
+      "@mudah-cli/mudah/testing": ["./packages/mudah/src/testing.ts"],
+      "@mudah-cli/mudah/ui": ["./packages/mudah/src/ui.ts"],
+      "@mudah-cli/mudah/terminal": ["./packages/mudah/src/terminal.ts"],
+      "@mudah-cli/mudah/animation": ["./packages/mudah/src/animation.ts"],
+      "@mudah-cli/create-mudah": ["./packages/create-mudah/src/index.ts"]
+    }
+  },
+  "include": [
+    "./packages/*/src",
+    "./packages/*/test",
+    "./examples/*/src",
+    "./examples/*/test",
+    "./vitest.config.ts"
+  ]
+}

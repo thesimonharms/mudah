@@ -1,0 +1,25 @@
+{
+  "name": "@mudah-cli/create-mudah",
+  "version": "0.1.0",
+  "description": "Interactive scaffolder for Mudah CLI apps — create-and-breathe.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "create-mudah": "./dist/cli.js"
+  },
+  "engines": { "node": ">=26" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "dependencies": {
+    "@mudah-cli/animation": "0.1.0",
+    "@mudah-cli/terminal": "0.1.0",
+    "@mudah-cli/ui": "0.1.0"
+  },
+  "publishConfig": { "access": "public" }
+}
