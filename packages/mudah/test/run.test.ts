@@ -161,3 +161,47 @@ describe('createWatcher', () => {
     await rm(dir, { recursive: true, force: true });
   });
 });
+
+describe('output modes', () => {
+  it('--json emits a machine-readable envelope with results', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['hello', '--json'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+
+    const parsed = JSON.parse(s.text().out.trim().split('\n').at(-1)!) as {
+      ok: boolean;
+      command?: string;
+      exitCode: number;
+      results?: Array<{ kind: string; message: string }>;
+    };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.command).toBe('hello');
+    expect(parsed.exitCode).toBe(0);
+    const messages = (parsed.results ?? []).map((r) => r.message).join(' ');
+    expect(messages.toLowerCase()).toContain('hello there');
+    expect(s.text().out).not.toContain('✓');
+  });
+
+  it('--json reports usage errors as structured failures', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['nope', '--json'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(2);
+    const parsed = JSON.parse(s.text().out.trim()) as {
+      ok: boolean;
+      exitCode: number;
+      error?: { message: string; hint?: string };
+    };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.exitCode).toBe(2);
+    expect(parsed.error?.message).toContain('Unknown command "nope"');
+    expect(parsed.error?.hint).toContain('--help');
+  });
+
+  it('--plain strips all ANSI from human output', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['hello', '--plain'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('hello there');
+    expect(s.text().out).not.toContain('\x1b[');
+  });
+});

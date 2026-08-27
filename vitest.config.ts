@@ -20,6 +20,7 @@ export default defineConfig({
         'terminal',
         'animation',
         'ui',
+        'tui',
         'console',
         'testing',
       ].map((name) => ({ find: `@mudah-cli/${name}`, replacement: packageSource(name) })),

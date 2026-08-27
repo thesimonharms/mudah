@@ -32,6 +32,7 @@ const packages = [
   'animation',
   'ui',
   'core',
+  'tui',
   'console',
   'testing',
   'mudah',

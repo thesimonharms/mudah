@@ -77,6 +77,16 @@ export abstract class Command {
     return this.promptsInstance().select(question, choices);
   }
 
+  /** Pick any number of choices (arrow keys + space on a TTY, numbered menu otherwise). */
+  protected multiselect(question: string, choices: string[], defaultChecked?: number[]): Promise<string[]> {
+    return this.promptsInstance().multiselect(question, choices, { defaultChecked });
+  }
+
+  /** Masked text entry — the value is never echoed to the terminal. */
+  protected password(question: string): Promise<string> {
+    return this.promptsInstance().password(question);
+  }
+
   /**
    * Render a usage error with this command's usage line. Commands call this
    * when their own validation fails.

@@ -14,6 +14,7 @@ const order = [
   'animation',
   'ui',
   'core',
+  'tui',
   'console',
   'testing',
   'mudah',

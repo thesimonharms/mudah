@@ -4,18 +4,24 @@
   "description": "Mudah application kernel: service providers, two-phase boot, events, and discovery.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=26" },
+  "engines": {
+    "node": ">=26"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/config": "0.1.0",
-    "@mudah-cli/container": "0.1.0"
+    "@mudah-cli/config": "^0.1.0",
+    "@mudah-cli/container": "^0.1.0"
   },
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

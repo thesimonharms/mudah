@@ -160,7 +160,11 @@ export class KeyParser {
     const esc = text.lastIndexOf('\x1b');
     if (esc < 0) return text.length;
     const rest = text.slice(esc + 1);
-    if (rest.length === 0) return -1; // bare escape: wait to see if a sequence follows
+    if (rest.length === 0) {
+      // Trailing lone ESC at a chunk boundary: terminals deliver CSI
+      // sequences as single reads, so a bare ESC here IS the escape key.
+      return esc + 1;
+    }
     if (rest[0] === '[') {
       // Complete only when a final byte (0x40–0x7e) terminates the sequence.
       return /^\[[0-9;?]*[\x40-\x7e]$/.test(rest) ? text.length : -1;

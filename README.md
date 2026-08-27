@@ -115,14 +115,28 @@ export default defineConfig({
 | `@mudah-cli/config` | Dotted-key config repository, `.env` handling, typed accessors |
 | `@mudah-cli/terminal` | Capability detection, OSC emitters, ANSI helpers, key parsing |
 | `@mudah-cli/animation` | Ticker, spinners, progress bars, parallel task trees |
-| `@mudah-cli/ui` | Design tokens, the `sleek` theme, Output primitives, tables, panels, markdown |
+| `@mudah-cli/ui` | Design tokens, the `sleek` theme, Output primitives (styled/plain/json), tables, panels, markdown |
 | `@mudah-cli/core` | The kernel: `Application` (extends Container), providers, events, discovery |
-| `@mudah-cli/console` | Signatures, `Command`, prompts, the console kernel, help rendering |
+| `@mudah-cli/console` | Signatures, `Command`, prompts (select/multiselect/password), the console kernel, help rendering |
+| `@mudah-cli/tui` | Full-screen apps: alt-buffer `Program`, diff renderer, focus-managed widgets |
 | `@mudah-cli/testing` | `TestApp` — in-process command dispatch with chained assertions |
 | `@mudah-cli/mudah` | Umbrella + `run()` entrypoint and built-in commands |
 | `@mudah-cli/create-mudah` | The scaffolder (`npm create @mudah-cli/mudah`) |
 
-The `@mudah-cli/mudah` umbrella re-exports the public surface with subpaths: `@mudah-cli/mudah`, `@mudah-cli/mudah/ui`, `@mudah-cli/mudah/terminal`, `@mudah-cli/mudah/animation`, `@mudah-cli/mudah/testing`.
+The `@mudah-cli/mudah` umbrella re-exports the public surface with subpaths: `@mudah-cli/mudah`, `@mudah-cli/mudah/ui`, `@mudah-cli/mudah/terminal`, `@mudah-cli/mudah/animation`, `@mudah-cli/mudah/tui`, `@mudah-cli/mudah/testing`.
+
+### Pick your depth (à-la-carte by design)
+
+Every package has its own npm name and depends on as little as possible, so you can enter the framework at any level — or skip it entirely and hack:
+
+- **Just want colors?** `npm i @mudah-cli/ui` — `paint()`, themes, tables, panels. No kernel, no CLI, no opinions about your app structure.
+- **Spinning progress in an existing script?** `@mudah-cli/animation` gives you `Spinner`/`ProgressBar`/`TaskRunner` with two dependencies and zero setup.
+- **Parse modern key input?** `@mudah-cli/terminal` is standalone: capability detection, OSC emitters, `KeyParser`.
+- **Your own command runner?** Skip `@mudah-cli/console`'s kernel and use just `parseSignature`/`parseInput`, or drop the whole layer and drive `Application` (the container + provider lifecycle) directly as a library.
+- **Go lower still:** `@mudah-cli/container` and `@mudah-cli/config` have no Mudah dependencies at all — use them in any TypeScript project.
+- **Full TUI without the framework?** `@mudah-cli/tui` mounts a `Program` on any streams you hand it: `new Program({ stdout, stdin })`. Nothing requires the `mudah` umbrella or a `mudah.json`.
+
+Conversely, the umbrella (`@mudah-cli/mudah`) is the "all the parts" install: one dependency, the whole stack wired together with `run()`, auto-discovery, and built-in commands.
 
 ### Built-in commands
 
@@ -136,6 +150,31 @@ Every app ships with:
 - `dev {command}` — watch mode: re-runs the command on changes (150 ms debounce)
 
 Global flags: `--help`, `--version`. Every command understands `--help`.
+
+Output modes work globally: `--json` emits machine-readable JSON lines plus a final `{ok, results|error}` envelope, and `--plain` strips all ANSI (log-friendly). Commands can target either mode explicitly via `this.output.isMachineReadable`.
+
+### Prompts and full-screen TUIs
+
+`Command` exposes interactive helpers that degrade gracefully — arrow-key UIs on a TTY, numbered/comma fallbacks when piped:
+
+```ts
+const env = await this.select('Environment', ['staging', 'production']); // ❯ arrow picker
+const features = await this.multiselect('Enable', ['cache', 'queue']);   // space to toggle
+const token = await this.password('API token');                          // masked input
+```
+
+For full-screen interfaces, build with `@mudah-cli/tui`:
+
+```ts
+import { Program, Container, List, Label, TextInput } from '@mudah-cli/mudah/tui';
+
+const program = new Program();
+const list = new List(items, (i) => program.quit());
+program.mount(new Container().add(new Label('Deploy'), list, new TextInput()));
+process.exitCode = await program.run(); // alt-buffer, diff-rendered, esc to exit
+```
+
+Widgets implement a two-method `Component` contract (`render(): string[]`, `onKey(event)`), so custom widgets are ordinary classes — focus cycling, key routing, and minimal repaints come from the container and renderer.
 
 ## Testing
 
@@ -197,8 +236,8 @@ The release script bumps all ten packages (and their internal deps) in lockstep,
 
 ## Roadmap
 
-- **v0.2** — OSC 10 runtime theme query, raw-mode arrow-key select prompts, OSC 8 hyperlinks in output, config schema validation, `--profile` flag, per-command timing events, update nudge (semver check with cache).
-- **v0.3** — interactive TUI screens (alt-buffer), command grouping/namespacing, plugin providers from `node_modules`.
+- **v0.2** — OSC 10 runtime theme query, config schema validation, `--profile` flag, per-command timing events, update nudge (semver check with cache).
+- **v0.3** — richer TUI widgets (tables, panels, scrolling viewports, mouse support), command grouping/namespacing, plugin providers from `node_modules`.
 
 ## License
 

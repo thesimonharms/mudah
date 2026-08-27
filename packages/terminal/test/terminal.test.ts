@@ -127,18 +127,20 @@ describe('KeyParser', () => {
     expect(parser.feed('1;5C')).toEqual([{ name: 'right' }]);
   });
 
-  it('resolves a bare escape once the next input is known', () => {
+  it('emits escape immediately at a chunk boundary', () => {
+    // Terminals deliver a full CSI sequence in one read, so a lone ESC at
+    // a chunk boundary IS the escape key (no second keypress needed).
     const parser = new KeyParser();
-    expect(parser.feed('\x1b')).toEqual([]);
-    expect(parser.feed('x').map((k) => k.name)).toEqual(['escape']);
-    expect(parser.feed('').map((k) => k.name)).toEqual(['x']);
+    expect(parser.feed('\x1b').map((k) => k.name)).toEqual(['escape']);
+    expect(parser.feed('x').map((k) => k.name)).toEqual(['x']);
   });
 
-  it('handles sequences split across arbitrary boundaries', () => {
+  it('reassembles sequences split after the introducer', () => {
+    // A split after "ESC [" is held and reassembled; only a split directly
+    // after ESC is treated as a bare escape (terminal reads are atomic).
     const parser = new KeyParser();
-    const full = '\x1b[3~';
     const seen: string[] = [];
-    for (const chunk of [full.slice(0, 1), full.slice(1, 3), full.slice(3)]) {
+    for (const chunk of ['\x1b[', '3~']) {
       seen.push(...parser.feed(chunk).map((k) => k.name));
     }
     expect(seen).toEqual(['delete']);

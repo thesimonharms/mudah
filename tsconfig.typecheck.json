@@ -5,6 +5,7 @@
     "paths": {
       "@mudah-cli/*": ["./packages/*/src/index.ts"],
       "@mudah-cli/mudah": ["./packages/mudah/src/index.ts"],
+      "@mudah-cli/mudah/tui": ["./packages/mudah/src/tui.ts"],
       "@mudah-cli/mudah/testing": ["./packages/mudah/src/testing.ts"],
       "@mudah-cli/mudah/ui": ["./packages/mudah/src/ui.ts"],
       "@mudah-cli/mudah/terminal": ["./packages/mudah/src/terminal.ts"],

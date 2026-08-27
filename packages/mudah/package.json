@@ -4,7 +4,9 @@
   "description": "An ergonomic, animation-rich CLI framework — speed, sleek design, and developer ergonomics for Node and Bun.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=26" },
+  "engines": {
+    "node": ">=26"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -22,23 +24,32 @@
       "types": "./dist/animation.d.ts",
       "default": "./dist/animation.js"
     },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "default": "./dist/tui.js"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/animation": "0.1.0",
-    "@mudah-cli/config": "0.1.0",
-    "@mudah-cli/console": "0.1.0",
-    "@mudah-cli/container": "0.1.0",
-    "@mudah-cli/core": "0.1.0",
-    "@mudah-cli/terminal": "0.1.0",
-    "@mudah-cli/testing": "0.1.0",
-    "@mudah-cli/ui": "0.1.0"
+    "@mudah-cli/animation": "^0.1.0",
+    "@mudah-cli/config": "^0.1.0",
+    "@mudah-cli/console": "^0.1.0",
+    "@mudah-cli/container": "^0.1.0",
+    "@mudah-cli/core": "^0.1.0",
+    "@mudah-cli/terminal": "^0.1.0",
+    "@mudah-cli/testing": "^0.1.0",
+    "@mudah-cli/tui": "^0.1.0",
+    "@mudah-cli/ui": "^0.1.0"
   },
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

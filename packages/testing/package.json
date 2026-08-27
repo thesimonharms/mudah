@@ -4,21 +4,28 @@
   "description": "In-process command test runner with captured output, mocked prompts, and JSON assertions.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=26" },
+  "engines": {
+    "node": ">=26"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/animation": "0.1.0",
-    "@mudah-cli/console": "0.1.0",
-    "@mudah-cli/core": "0.1.0",
-    "@mudah-cli/terminal": "0.1.0",
-    "@mudah-cli/ui": "0.1.0"
+    "@mudah-cli/animation": "^0.1.0",
+    "@mudah-cli/console": "^0.1.0",
+    "@mudah-cli/core": "^0.1.0",
+    "@mudah-cli/terminal": "^0.1.0",
+    "@mudah-cli/tui": "^0.1.0",
+    "@mudah-cli/ui": "^0.1.0"
   },
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -1,5 +1,6 @@
 import {
   Application,
+  UsageError,
   loadManifest,
   type Application as App,
 } from '@mudah-cli/core';
@@ -67,6 +68,15 @@ export async function run(options: RunOptions = {}): Promise<number> {
     osc9: caps.osc9,
   });
 
+  // Output-mode flags (--json / --plain) may appear anywhere.
+  if (argv.includes('--json')) {
+    output.setMode('json');
+  } else if (argv.includes('--plain')) {
+    output.setMode('plain');
+  }
+  const jsonMode = output.isMachineReadable;
+  const startedAt = Date.now();
+
   // Providers: discover app providers, boot, then evaluate lazy predicates.
   await app.discoverProviders();
   await app.boot();
@@ -89,19 +99,46 @@ export async function run(options: RunOptions = {}): Promise<number> {
     }
   }
 
+  // Strip the mode flags before dispatch so commands don't see them as
+  // unknown options; remember the command name for envelopes/errors.
+  const dispatchArgv = argv.filter((a) => a !== '--json' && a !== '--plain');
+  const commandName = dispatchArgv[0];
+
   // Global flags.
-  const [first] = argv;
-  if (first === '--help' || first === '-h' || first === undefined) {
+  const [first] = dispatchArgv;
+  if (first === undefined || first === '--help' || first === '-h') {
+    if (jsonMode) {
+      options.stdout?.write(
+        output.jsonEnvelope({ ok: true, exitCode: 0, command: 'help', commands: kernel.list().map((c) => c.name) }),
+      );
+      return 0;
+    }
     const lines: string[] = [];
     renderCommandList(manifest.name, manifest.version, kernel.list(), lines);
     output.raw(lines.join('\n'));
     return 0;
   }
   if (first === '--version') {
+    if (jsonMode) {
+      options.stdout?.write(output.jsonEnvelope({ ok: true, exitCode: 0, command: 'version', version: manifest.version }));
+      return 0;
+    }
     output.info(`${manifest.name} v${manifest.version}`);
     return 0;
   }
-  if (first !== undefined && (argv[1] === '--help' || argv[1] === '-h') && kernel.has(first)) {
+  if ((argv[1] === '--help' || argv[1] === '-h') && kernel.has(first)) {
+    if (jsonMode) {
+      const entry = kernel.get(first)!;
+      options.stdout?.write(
+        output.jsonEnvelope({
+          ok: true,
+          exitCode: 0,
+          command: first,
+          help: { usage: entry.signature.name, description: entry.description },
+        }),
+      );
+      return 0;
+    }
     const lines: string[] = [];
     renderCommandHelp(manifest.name, kernel.get(first)!, lines);
     output.raw(lines.join('\n'));
@@ -109,9 +146,40 @@ export async function run(options: RunOptions = {}): Promise<number> {
   }
 
   try {
-    return await kernel.dispatch(argv);
-  } catch (error) {
-    return renderError(error, output);
+    const code = await kernel.dispatch(dispatchArgv);
+    if (jsonMode) {
+      options.stdout?.write(
+        output.jsonEnvelope({
+          ok: code === 0,
+          exitCode: code,
+          command: commandName,
+          durationMs: Date.now() - startedAt,
+        }),
+      );
+    }
+    return code;
+  } catch (rawError) {
+    let parsed: { message: string; hint?: string; usage?: string };
+    if (rawError instanceof UsageError) {
+      parsed = { message: rawError.message, hint: rawError.hint, usage: rawError.usage };
+    } else if (rawError instanceof Error) {
+      parsed = { message: rawError.message };
+    } else {
+      parsed = { message: String(rawError) };
+    }
+    const code = renderError(rawError, output);
+    if (jsonMode) {
+      options.stdout?.write(
+        output.jsonEnvelope({
+          ok: false,
+          exitCode: code,
+          command: commandName,
+          durationMs: Date.now() - startedAt,
+          error: parsed,
+        }),
+      );
+    }
+    return code;
   }
 }
 

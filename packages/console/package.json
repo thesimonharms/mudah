@@ -4,20 +4,26 @@
   "description": "Command system: string signatures, typed dispatch, interactive prompts, and help rendering.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=26" },
+  "engines": {
+    "node": ">=26"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/animation": "0.1.0",
-    "@mudah-cli/core": "0.1.0",
-    "@mudah-cli/terminal": "0.1.0",
-    "@mudah-cli/ui": "0.1.0"
+    "@mudah-cli/animation": "^0.1.0",
+    "@mudah-cli/core": "^0.1.0",
+    "@mudah-cli/terminal": "^0.1.0",
+    "@mudah-cli/ui": "^0.1.0"
   },
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

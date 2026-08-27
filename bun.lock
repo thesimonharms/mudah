@@ -30,7 +30,7 @@
       "name": "@mudah-cli/animation",
       "version": "0.1.0",
       "dependencies": {
-        "@mudah-cli/terminal": "0.1.0",
+        "@mudah-cli/terminal": "^0.1.0",
       },
     },
     "packages/config": {
@@ -41,10 +41,10 @@
       "name": "@mudah-cli/console",
       "version": "0.1.0",
       "dependencies": {
-        "@mudah-cli/animation": "0.1.0",
-        "@mudah-cli/core": "0.1.0",
-        "@mudah-cli/terminal": "0.1.0",
-        "@mudah-cli/ui": "0.1.0",
+        "@mudah-cli/animation": "^0.1.0",
+        "@mudah-cli/core": "^0.1.0",
+        "@mudah-cli/terminal": "^0.1.0",
+        "@mudah-cli/ui": "^0.1.0",
       },
     },
     "packages/container": {
@@ -55,8 +55,8 @@
       "name": "@mudah-cli/core",
       "version": "0.1.0",
       "dependencies": {
-        "@mudah-cli/config": "0.1.0",
-        "@mudah-cli/container": "0.1.0",
+        "@mudah-cli/config": "^0.1.0",
+        "@mudah-cli/container": "^0.1.0",
       },
     },
     "packages/create-mudah": {
@@ -75,14 +75,15 @@
       "name": "@mudah-cli/mudah",
       "version": "0.1.0",
       "dependencies": {
-        "@mudah-cli/animation": "0.1.0",
-        "@mudah-cli/config": "0.1.0",
-        "@mudah-cli/console": "0.1.0",
-        "@mudah-cli/container": "0.1.0",
-        "@mudah-cli/core": "0.1.0",
-        "@mudah-cli/terminal": "0.1.0",
-        "@mudah-cli/testing": "0.1.0",
-        "@mudah-cli/ui": "0.1.0",
+        "@mudah-cli/animation": "^0.1.0",
+        "@mudah-cli/config": "^0.1.0",
+        "@mudah-cli/console": "^0.1.0",
+        "@mudah-cli/container": "^0.1.0",
+        "@mudah-cli/core": "^0.1.0",
+        "@mudah-cli/terminal": "^0.1.0",
+        "@mudah-cli/testing": "^0.1.0",
+        "@mudah-cli/tui": "^0.1.0",
+        "@mudah-cli/ui": "^0.1.0",
       },
     },
     "packages/terminal": {
@@ -93,9 +94,18 @@
       "name": "@mudah-cli/testing",
       "version": "0.1.0",
       "dependencies": {
-        "@mudah-cli/animation": "0.1.0",
-        "@mudah-cli/console": "0.1.0",
-        "@mudah-cli/core": "0.1.0",
+        "@mudah-cli/animation": "^0.1.0",
+        "@mudah-cli/console": "^0.1.0",
+        "@mudah-cli/core": "^0.1.0",
+        "@mudah-cli/terminal": "^0.1.0",
+        "@mudah-cli/tui": "^0.1.0",
+        "@mudah-cli/ui": "^0.1.0",
+      },
+    },
+    "packages/tui": {
+      "name": "@mudah-cli/tui",
+      "version": "0.1.0",
+      "dependencies": {
         "@mudah-cli/terminal": "0.1.0",
         "@mudah-cli/ui": "0.1.0",
       },
@@ -104,7 +114,7 @@
       "name": "@mudah-cli/ui",
       "version": "0.1.0",
       "dependencies": {
-        "@mudah-cli/terminal": "0.1.0",
+        "@mudah-cli/terminal": "^0.1.0",
       },
     },
   },
@@ -180,6 +190,8 @@
     "@mudah-cli/terminal": ["@mudah-cli/terminal@workspace:packages/terminal"],
 
     "@mudah-cli/testing": ["@mudah-cli/testing@workspace:packages/testing"],
+
+    "@mudah-cli/tui": ["@mudah-cli/tui@workspace:packages/tui"],
 
     "@mudah-cli/ui": ["@mudah-cli/ui@workspace:packages/ui"],
 
