@@ -1,0 +1,23 @@
+{
+  "name": "convert-img",
+  "version": "0.1.0",
+  "description": "The ultimate image converter — CLI + TUI, powered by Mudah.",
+  "type": "module",
+  "private": true,
+  "bin": { "convert-img": "./bin/convert-img.js" },
+  "engines": { "node": ">=26" },
+  "scripts": {
+    "start": "node bin/convert-img.js",
+    "dev": "node bin/convert-img.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mudah-cli/mudah": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.0"
+  }
+}

@@ -5,6 +5,10 @@ import type { CommandEntry } from './kernel.js';
 export function formatUsage(entry: CommandEntry): string {
   const parts = [entry.signature.name];
   for (const arg of entry.signature.args) {
+    if (arg.variadic) {
+      parts.push(`{${arg.name}...}`);
+      continue;
+    }
     if (arg.optional) {
       parts.push(arg.defaultValue !== undefined ? `{${arg.name}=${arg.defaultValue}}` : `{${arg.name}?}`);
     } else {
@@ -53,7 +57,13 @@ export function renderCommandHelp(appName: string, entry: CommandEntry, lines: s
     lines.push('Arguments:');
     const width = Math.max(...entry.signature.args.map((a) => a.name.length)) + 2;
     for (const arg of entry.signature.args) {
-      const kind = arg.optional ? (arg.defaultValue !== undefined ? `optional (default: ${arg.defaultValue})` : 'optional') : 'required';
+      const kind = arg.variadic
+        ? 'one or more (variadic)'
+        : arg.optional
+          ? arg.defaultValue !== undefined
+            ? `optional (default: ${arg.defaultValue})`
+            : 'optional'
+          : 'required';
       lines.push(`  ${arg.name + ' '.repeat(Math.max(1, width - arg.name.length))} ${kind}`);
     }
     lines.push('');

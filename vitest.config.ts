@@ -9,6 +9,7 @@ export default defineConfig({
     alias: [
       { find: '@mudah-cli/create-mudah', replacement: fileURLToPath(new URL('./packages/create-mudah/src/index.ts', import.meta.url)) },
       { find: '@mudah-cli/mudah/testing', replacement: fileURLToPath(new URL('./packages/mudah/src/testing.ts', import.meta.url)) },
+      { find: '@mudah-cli/mudah/tui', replacement: fileURLToPath(new URL('./packages/mudah/src/tui.ts', import.meta.url)) },
       { find: '@mudah-cli/mudah/ui', replacement: fileURLToPath(new URL('./packages/mudah/src/ui.ts', import.meta.url)) },
       { find: '@mudah-cli/mudah/terminal', replacement: fileURLToPath(new URL('./packages/mudah/src/terminal.ts', import.meta.url)) },
       { find: '@mudah-cli/mudah/animation', replacement: fileURLToPath(new URL('./packages/mudah/src/animation.ts', import.meta.url)) },

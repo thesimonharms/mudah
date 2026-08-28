@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@mudah-cli/mudah": ["../../packages/mudah/src/index.ts"],
+      "@mudah-cli/mudah/*": ["../../packages/mudah/src/*.ts"],
+      "@mudah-cli/tui": ["../../packages/tui/src/index.ts"],
+      "@mudah-cli/terminal": ["../../packages/terminal/src/index.ts"],
+      "@mudah-cli/ui": ["../../packages/ui/src/index.ts"],
+      "@mudah-cli/animation": ["../../packages/animation/src/index.ts"],
+      "@mudah-cli/console": ["../../packages/console/src/index.ts"]
+    }
+  },
+  "include": ["src", "config", "test"]
+}

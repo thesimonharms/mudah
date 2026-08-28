@@ -1,0 +1,7 @@
+{
+  "name": "convert-img",
+  "version": "0.1.0",
+  "bin": "convert-img",
+  "description": "The ultimate image converter — CLI + TUI, powered by Mudah.",
+  "ui": { "theme": "auto" }
+}

@@ -11,6 +11,21 @@
         "vitest": "^4.1.11",
       },
     },
+    "examples/convert-img": {
+      "name": "convert-img",
+      "version": "0.1.0",
+      "bin": {
+        "convert-img": "./bin/convert-img.js",
+      },
+      "dependencies": {
+        "@mudah-cli/mudah": "*",
+      },
+      "devDependencies": {
+        "@types/node": "^26.0.0",
+        "typescript": "^7.0.0",
+        "vitest": "^4.0.0",
+      },
+    },
     "examples/hello-cli": {
       "name": "hello-cli",
       "version": "0.1.0",
@@ -296,6 +311,8 @@
     "assertion-error": ["assertion-error@2.0.1", "", {}, "sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA=="],
 
     "chai": ["chai@6.2.2", "", {}, "sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg=="],
+
+    "convert-img": ["convert-img@workspace:examples/convert-img"],
 
     "convert-source-map": ["convert-source-map@2.0.0", "", {}, "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="],
 

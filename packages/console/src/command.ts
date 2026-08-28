@@ -55,6 +55,14 @@ export abstract class Command {
     return this.input.args[name];
   }
 
+  /**
+   * Values collected by a variadic argument (`{paths...}`) — empty when the
+   * argument doesn't exist or collected nothing.
+   */
+  list(name: string): string[] {
+    return this.input.lists[name] ?? [];
+  }
+
   /** An option value: boolean for flags, string for `--opt=value`. */
   option<T extends string | boolean>(name: string): T | undefined {
     return this.input.options[name] as T | undefined;

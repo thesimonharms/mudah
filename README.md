@@ -138,6 +138,20 @@ Every package has its own npm name and depends on as little as possible, so you 
 
 Conversely, the umbrella (`@mudah-cli/mudah`) is the "all the parts" install: one dependency, the whole stack wired together with `run()`, auto-discovery, and built-in commands.
 
+## Examples
+
+**[examples/convert-img](examples/convert-img)** — the ultimate image converter, both a CLI and a TUI, with zero npm dependencies beyond `@mudah-cli/mudah`:
+
+```sh
+cd examples/convert-img
+bun bin/convert-img.js formats                 # capability matrix for this machine
+bun bin/convert-img.js convert *.png --to=webp # batch CLI (variadic paths)
+bun bin/convert-img.js                         # full-screen TUI wizard
+bun test                                       # 19 tests, real conversions
+```
+
+Codecs come from `Bun.Image` (native libjpeg-turbo/spng/libwebp) plus optional system tools (libheif for HEIC/AVIF, ImageMagick for GIF) auto-detected at startup — a live demo of the driver/provider pattern: the planner picks a direct route when one exists, otherwise routes through PNG in two hops (e.g. `heic → png → gif`).
+
 ### Built-in commands
 
 Every app ships with:
@@ -236,7 +250,7 @@ The release script bumps all ten packages (and their internal deps) in lockstep,
 
 ## Roadmap
 
-- **v0.2** — OSC 10 runtime theme query, config schema validation, `--profile` flag, per-command timing events, update nudge (semver check with cache).
+- **v0.2** — OSC 10 runtime theme query, config schema validation, `--profile` flag, update nudge (semver check with cache).
 - **v0.3** — richer TUI widgets (tables, panels, scrolling viewports, mouse support), command grouping/namespacing, plugin providers from `node_modules`.
 
 ## License
