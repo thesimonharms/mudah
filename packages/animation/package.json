@@ -1,6 +1,6 @@
 {
   "name": "@mudah-cli/animation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "60fps terminal animation engine: ticker, spinners, progress bars, task trees, and transitions.",
   "type": "module",
   "license": "MIT",
@@ -18,7 +18,7 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/terminal": "^0.1.0"
+    "@mudah-cli/terminal": "^0.2.0"
   },
   "publishConfig": {
     "access": "public"

@@ -3,10 +3,11 @@ import {
   UsageError,
   loadManifest,
   type Application as App,
+  type MudahManifest,
 } from '@mudah-cli/core';
 import { detectCapabilities } from '@mudah-cli/terminal';
 import { Output, resolveTheme } from '@mudah-cli/ui';
-import { ConsoleKernel, renderError, renderCommandHelp, renderCommandList, type CommandModule } from '@mudah-cli/console';
+import { ConsoleKernel, renderError, renderCommandHelp, renderCommandList, parseSignature, type CommandModule } from '@mudah-cli/console';
 import HelpCommand from './commands/help.command.js';
 import VersionCommand from './commands/version.command.js';
 import MakeCommand from './commands/make.command.js';
@@ -26,6 +27,17 @@ export interface RunOptions {
   /** Where stdout/stderr go (defaults to the real streams). */
   stdout?: { write(data: string): unknown };
   stderr?: { write(data: string): unknown };
+  /**
+   * Bake the manifest instead of reading `mudah.json` from `cwd`. Use this
+   * for bundled/single-file tools that run from arbitrary directories.
+   */
+  manifest?: MudahManifest;
+  /**
+   * Register command modules explicitly (bundled apps that can't rely on
+   * filesystem discovery). Registered after discovered commands; duplicates
+   * are skipped with a warning.
+   */
+  commands?: CommandModule[];
 }
 
 /**
@@ -47,9 +59,9 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const env = options.env;
   const caps = detectCapabilities({ env });
 
-  let manifest;
+  let manifest: MudahManifest;
   try {
-    manifest = loadManifest(cwd);
+    manifest = options.manifest ?? loadManifest(cwd);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     (options.stderr ?? process.stderr).write(message + '\n');
@@ -82,16 +94,32 @@ export async function run(options: RunOptions = {}): Promise<number> {
   await app.boot();
   await app.evaluateLazy();
 
-  // Kernel: built-ins first, then discovered app commands, then manifest extras.
+  // Kernel: built-ins first, then — in order — discovered app commands,
+  // manifest extras, and explicitly injected modules (bundled apps).
+  // First registration of a name wins; later duplicates are skipped so a
+  // checkout that both discovers and injects the same command stays clean.
   const kernel = new ConsoleKernel(app, output);
   registerBuiltIns(kernel);
+  const seen = new Set(kernel.list().map((entry) => entry.name));
 
-  const modules = [...(await app.discoverCommandModules())];
+  const candidates = [
+    ...(await app.discoverCommandModules()),
+    ...(options.commands ?? []),
+  ];
   for (const extra of manifest.commands ?? []) {
     const mod = (await app.importModule(extra)) as unknown as CommandModule;
-    if (mod.default) modules.push(mod);
+    if (mod.default) candidates.push(mod);
   }
-  for (const mod of modules) {
+
+  for (const mod of candidates) {
+    try {
+      const name = parseSignature(new mod.default().signature ?? '').name;
+      if (name === '') continue;
+      if (seen.has(name)) continue;
+      seen.add(name);
+    } catch {
+      // register() below surfaces the real error.
+    }
     try {
       kernel.register(mod);
     } catch (error) {

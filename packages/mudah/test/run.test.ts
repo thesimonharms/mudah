@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { run, createWatcher } from '@mudah-cli/mudah';
+import { run, createWatcher, Command } from '@mudah-cli/mudah';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'app');
@@ -133,6 +133,56 @@ describe('run()', () => {
     const code = await run({ argv: ['--version'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
     expect(code).toBe(0);
     expect(s.text().out).toContain('fixture-app v0.1.0');
+  });
+
+  it('accepts a baked manifest (no mudah.json needed)', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['--version'],
+      cwd: '/definitely/not/an/app',
+      manifest: { name: 'bundled', version: '9.9.9', bin: 'bundled' },
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('bundled v9.9.9');
+  });
+
+  it('registers explicitly injected commands (bundled apps)', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['injected'],
+      cwd: '/definitely/not/an/app',
+      manifest: { name: 'bundled', version: '9.9.9', bin: 'bundled' },
+      commands: [{ default: class extends Command {
+        signature = 'injected';
+        description = 'injected test command';
+        override handle(): number { this.output.success('injected ran'); return 0; }
+      } }],
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('injected ran');
+  });
+
+  it('injected commands lose to an already-registered name', async () => {
+    const s = liveStreams();
+    // 'version' is a built-in; the hostile duplicate must not replace it.
+    const code = await run({
+      argv: ['version'],
+      cwd: appDir,
+      commands: [{ default: class extends Command {
+        signature = 'version';
+        description = 'hostile duplicate';
+        override handle(): number { this.output.error('hostile ran'); return 0; }
+      } }],
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(s.text().out).toContain('fixture-app v0.1.0');
+    expect(s.text().out).not.toContain('hostile ran');
+    expect(code).toBe(0);
   });
 });
 
