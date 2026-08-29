@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectCapabilities, guardedOsc, KeyParser, osc, parseKeys } from '@mudah-cli/terminal';
+import { detectCapabilities, guardedOsc, KeyParser, osc, parseKeys, enableKittyKeyboard, disableKittyKeyboard } from '@mudah-cli/terminal';
 
 describe('detectCapabilities', () => {
   it('detects Ghostty with truecolor and OSC 9 notifications', () => {
@@ -11,6 +11,8 @@ describe('detectCapabilities', () => {
     expect(caps.trueColor).toBe(true);
     expect(caps.osc9).toBe(true);
     expect(caps.osc133).toBe(false);
+    expect(caps.kittyGraphics).toBe(true);
+    expect(caps.kittyKeyboard).toBe(true);
     expect(caps.animations).toBe(true);
   });
 
@@ -22,6 +24,8 @@ describe('detectCapabilities', () => {
     expect(caps.brand).toBe('kitty');
     expect(caps.osc133).toBe(true);
     expect(caps.osc9).toBe(false);
+    expect(caps.kittyGraphics).toBe(true);
+    expect(caps.kittyKeyboard).toBe(true);
   });
 
   it('honors NO_COLOR', () => {
@@ -122,9 +126,9 @@ describe('parseKeys', () => {
 describe('KeyParser', () => {
   it('buffers incomplete escape sequences across chunks', () => {
     const parser = new KeyParser();
-    expect(parser.feed('a')).toEqual([{ name: 'a', ch: 'a' }]);
+    expect(parser.feed('a')).toEqual([{ name: 'a', ch: 'a', kind: 'press' }]);
     expect(parser.feed('\x1b[')).toEqual([]);
-    expect(parser.feed('1;5C')).toEqual([{ name: 'right' }]);
+    expect(parser.feed('1;5C')).toEqual([{ name: 'right', kind: 'press', shift: false, alt: false, ctrl: true }]);
   });
 
   it('emits escape immediately at a chunk boundary', () => {
@@ -144,6 +148,44 @@ describe('KeyParser', () => {
       seen.push(...parser.feed(chunk).map((k) => k.name));
     }
     expect(seen).toEqual(['delete']);
+  });
+});
+
+describe('Kitty keyboard protocol', () => {
+  const kinds = (s: string) => parseKeys(s).map((k) => ({ name: k.name, kind: k.kind, ch: k.ch }));
+
+  it('parses CSI u press and release for a letter', () => {
+    expect(kinds('\x1b[97u')).toEqual([{ name: 'a', kind: 'press', ch: 'a' }]);
+    expect(kinds('\x1b[97;1:3u')).toEqual([{ name: 'a', kind: 'release', ch: 'a' }]);
+    expect(kinds('\x1b[97;1:2u')).toEqual([{ name: 'a', kind: 'repeat', ch: 'a' }]);
+  });
+
+  it('maps ctrl+c from CSI u so quit still works', () => {
+    const [event] = parseKeys('\x1b[99;5u');
+    expect(event?.name).toBe('ctrl+c');
+    expect(event?.ctrl).toBe(true);
+    expect(event?.kind).toBe('press');
+  });
+
+  it('parses an arrow release', () => {
+    const [event] = parseKeys('\x1b[1;1:3A');
+    expect(event?.name).toBe('up');
+    expect(event?.kind).toBe('release');
+  });
+
+  it('skips a Kitty graphics APC so it never becomes a key', () => {
+    expect(parseKeys('\x1b_Gi=1;OK\x1b\\a').map((k) => k.name)).toEqual(['a']);
+  });
+
+  it('emits enable and disable sequences', () => {
+    expect(enableKittyKeyboard()).toBe('\x1b[>11u');
+    expect(disableKittyKeyboard()).toBe('\x1b[<u');
+  });
+
+  it('reassembles a CSI u split across chunks', () => {
+    const parser = new KeyParser();
+    expect(parser.feed('\x1b[97;1:')).toEqual([]);
+    expect(parser.feed('3u').map((k) => k.kind)).toEqual(['release']);
   });
 });
 

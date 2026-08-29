@@ -205,6 +205,14 @@ describe('Container focus cycling', () => {
     expect(c.focused).toBe(first);
   });
 
+  it('ignores key-up so a release does not cycle focus', () => {
+    const c = arrows();
+    const [first] = c.components as [TextInput, TextInput];
+    expect(c.focused).toBe(first);
+    c.handleKey({ name: 'tab', kind: 'release' });
+    expect(c.focused).toBe(first);
+  });
+
   it('routes keys to the focused component only', () => {
     const c = arrows();
     const [first, second] = c.components as [TextInput, TextInput];

@@ -21,7 +21,15 @@ export {
   type ThemeQueryOptions,
   type ThemeQueryResult,
 } from './theme-query.js';
-export { enterRawMode, KeyParser, parseKeys, type KeyEvent, type KeyName } from './keys.js';
+export { enterRawMode, KeyParser, parseKeys, enableKittyKeyboard, disableKittyKeyboard, KITTY_KEYBOARD, KITTY_KEYBOARD_KEYUP, type KeyEvent, type KeyKind, type KeyName } from './keys.js';
+export {
+  KittyGraphics,
+  encodeHalfBlocks,
+  encodeKittyDelete,
+  encodeKittyImage,
+  type KittyImageOptions,
+  type PixelFormat,
+} from './graphics.js';
 export {
   disableMouse,
   enableMouse,

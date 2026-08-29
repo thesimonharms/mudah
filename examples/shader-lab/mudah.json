@@ -1,0 +1,9 @@
+{
+  "name": "shader-lab",
+  "version": "0.3.0",
+  "bin": "shader-lab",
+  "description": "Live WGSL playground for @mudah-cli/vgpu",
+  "ui": {
+    "theme": "auto"
+  }
+}

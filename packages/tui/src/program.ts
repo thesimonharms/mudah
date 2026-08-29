@@ -4,6 +4,8 @@ import {
   parseMouseEvents,
   disableMouse,
   enableMouse,
+  enableKittyKeyboard,
+  disableKittyKeyboard,
   type KeyEvent,
   type MouseModeOptions,
 } from '@mudah-cli/terminal';
@@ -27,6 +29,14 @@ export interface ProgramOptions {
    * terminal's own text selection.
    */
   mouse?: boolean | MouseModeOptions;
+  /**
+   * Enable the Kitty keyboard protocol (key-up, unambiguous modifiers).
+   * Default false. Ghostty, Kitty, and WezTerm honor it; other terminals
+   * ignore the enable sequence.
+   */
+  keyboard?: boolean;
+  /** Called for every key event, including repeats and releases. */
+  onKey?: (event: KeyEvent) => void;
 }
 
 /**
@@ -50,6 +60,8 @@ export class Program {
   private readonly frameMs: number;
   private readonly inline: boolean;
   private readonly mouse: MouseModeOptions | false;
+  private readonly keyboard: boolean;
+  private readonly onKeyHook: ((event: KeyEvent) => void) | undefined;
 
   private container: Container | undefined;
   private readonly renderer = new DiffRenderer();
@@ -67,6 +79,8 @@ export class Program {
     this.frameMs = options.frameMs ?? 16;
     this.inline = options.inline ?? false;
     this.mouse = options.mouse === true ? {} : options.mouse === undefined ? false : options.mouse;
+    this.keyboard = options.keyboard === true;
+    this.onKeyHook = options.onKey;
   }
 
   /** Set (or replace) the component tree. */
@@ -102,6 +116,7 @@ export class Program {
       if (tty) {
         this.stdout.write('\x1b[?25l'); // hide cursor
         if (this.mouse !== false) this.stdout.write(enableMouse(this.mouse));
+        if (this.keyboard) this.stdout.write(enableKittyKeyboard());
         this.exitRaw = enterRawMode(this.stdin!);
         this.dataListener = (chunk): void => {
           for (const event of this.parser.feed(String(chunk))) {
@@ -139,6 +154,10 @@ export class Program {
   }
 
   private handleKey(event: KeyEvent): void {
+    this.onKeyHook?.(event);
+    // Releases must not navigate widgets or quit. Games that need key-up
+    // listen on `onKey`.
+    if (event.kind === 'release') return;
     if (event.name === 'escape' || event.name === 'ctrl+c') {
       this.quit(event.name === 'ctrl+c' ? 130 : 0);
       return;
@@ -183,6 +202,7 @@ export class Program {
     let out = '';
     if (!this.inline && tty) out += '\x1b[?1049l';
     if (this.mouse !== false && tty) out += disableMouse(this.mouse);
+    if (this.keyboard && tty) out += disableKittyKeyboard();
     out += '\x1b[?25h'; // show cursor
     this.stdout.write(out);
     this.running = false;

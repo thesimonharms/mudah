@@ -475,6 +475,7 @@ export class Container {
 
   /** Route a key: focused widget first, then the container's own handling. */
   handleKey(event: KeyEvent): void {
+    if (event.kind === 'release') return;
     if (event.name === 'tab' || event.name === 'shift-tab') {
       this.cycle(event.name === 'tab' ? 1 : -1);
       return;

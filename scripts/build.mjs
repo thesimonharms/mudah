@@ -17,6 +17,7 @@ const order = [
   'tui',
   'console',
   'testing',
+  'vgpu',
   'mudah',
   'create-mudah',
 ];

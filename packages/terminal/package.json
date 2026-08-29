@@ -1,7 +1,7 @@
 {
   "name": "@mudah-cli/terminal",
-  "version": "0.2.0",
-  "description": "Terminal capability detection, OSC feature emitters, and a modern input layer (kitty keyboard, bracketed paste).",
+  "version": "0.3.0",
+  "description": "Terminal capability detection, OSC emitters, Kitty graphics, Kitty keyboard (key-up), and key/mouse parsing.",
   "type": "module",
   "license": "MIT",
   "engines": {

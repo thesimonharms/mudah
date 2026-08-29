@@ -35,6 +35,7 @@ const packages = [
   'tui',
   'console',
   'testing',
+  'vgpu',
   'mudah',
   'create-mudah',
 ];

@@ -1,6 +1,6 @@
 {
   "name": "@mudah-cli/ui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Terminal design system: tokens, themes, output primitives, tables, panels, and markdown rendering.",
   "type": "module",
   "license": "MIT",
@@ -18,7 +18,7 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/terminal": "^0.2.0"
+    "@mudah-cli/terminal": "^0.3.0"
   },
   "publishConfig": {
     "access": "public"

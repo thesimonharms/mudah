@@ -24,6 +24,16 @@ export interface TerminalCapabilities {
    * at runtime. Everything modern does; dumb terminals and CI do not.
    */
   readonly themeQuery: boolean;
+  /**
+   * Kitty graphics protocol (APC `_G`): pixel images in the terminal.
+   * Ghostty, Kitty, and WezTerm.
+   */
+  readonly kittyGraphics: boolean;
+  /**
+   * Kitty keyboard protocol (CSI u), including key-up when enabled.
+   * Ghostty, Kitty, and WezTerm.
+   */
+  readonly kittyKeyboard: boolean;
   /** Cursor show/hide is safe. */
   readonly cursorControl: boolean;
   /** Best-guess terminal theme. */
@@ -88,6 +98,8 @@ export function detectCapabilities(options: DetectCapabilitiesOptions = {}): Ter
     osc133:
       brand === 'kitty' || brand === 'wezterm' || brand === 'iterm' || brand === 'vscode' || brand === 'foot',
     themeQuery: isTty && brand !== 'apple-terminal' && env['TERM'] !== 'dumb',
+    kittyGraphics: isTty && (brand === 'ghostty' || brand === 'kitty' || brand === 'wezterm'),
+    kittyKeyboard: isTty && (brand === 'ghostty' || brand === 'kitty' || brand === 'wezterm'),
     cursorControl: isTty,
     theme: overrides.theme ?? 'unknown',
     width: options.width ?? process.stdout.columns ?? 80,

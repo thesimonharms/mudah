@@ -1,7 +1,7 @@
 {
-  "name": "@mudah-cli/animation",
+  "name": "@mudah-cli/vgpu",
   "version": "0.3.0",
-  "description": "60fps terminal animation engine: ticker, spinners, progress bars, task trees, and transitions.",
+  "description": "Run vgpu WGSL effects inside a Mudah app and blit the pixels to the terminal (Kitty graphics, with a half-block fallback).",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -18,7 +18,8 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/terminal": "^0.3.0"
+    "@mudah-cli/terminal": "^0.3.0",
+    "vgpu": "^0.3.1"
   },
   "publishConfig": {
     "access": "public"
