@@ -5,7 +5,7 @@ import {
   enableKittyKeyboard,
   enterRawMode,
   type OscWriter,
-} from '@mudah-cli/terminal';
+} from '@mudah-cli/mudah/terminal';
 import { ShaderSession } from '@mudah-cli/vgpu';
 import { SHADERS } from './shaders.js';
 
