@@ -1,6 +1,6 @@
 {
   "name": "@mudah-cli/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Mudah application kernel: service providers, two-phase boot, events, and discovery.",
   "type": "module",
   "license": "MIT",
@@ -18,8 +18,8 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/config": "^0.3.0",
-    "@mudah-cli/container": "^0.3.0"
+    "@mudah-cli/config": "^0.4.0",
+    "@mudah-cli/container": "^0.4.0"
   },
   "publishConfig": {
     "access": "public"
