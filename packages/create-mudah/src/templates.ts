@@ -1,3 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+function mudahRange(): string {
+  const pkg = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+  ) as { version: string };
+  return `^${pkg.version}`;
+}
+
 export function slugify(name: string): string {
   return name
     .trim()
@@ -35,7 +45,7 @@ export function appTemplates(name: string): [string, string][] {
             test: 'vitest run',
             typecheck: 'tsc --noEmit',
           },
-          dependencies: { '@mudah-cli/mudah': '^0.1.0' },
+          dependencies: { '@mudah-cli/mudah': mudahRange() },
           devDependencies: {
             '@types/node': '^26.0.0',
             typescript: '^7.0.0',

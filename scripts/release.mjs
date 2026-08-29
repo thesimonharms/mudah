@@ -35,6 +35,7 @@ const packages = [
   'tui',
   'console',
   'testing',
+  'audio',
   'vgpu',
   'mudah',
   'create-mudah',

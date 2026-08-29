@@ -25,6 +25,7 @@ export default defineConfig({
         'tui',
         'console',
         'testing',
+        'audio',
         'vgpu',
       ].map((name) => ({ find: `@mudah-cli/${name}`, replacement: packageSource(name) })),
     ],

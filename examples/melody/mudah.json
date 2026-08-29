@@ -1,0 +1,9 @@
+{
+  "name": "melody",
+  "version": "0.5.0",
+  "bin": "melody",
+  "description": "Public-domain melodies for @mudah-cli/audio",
+  "ui": {
+    "theme": "auto"
+  }
+}

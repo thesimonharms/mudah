@@ -2,7 +2,7 @@
 
 *An ergonomic, animation-rich CLI framework* for the modern terminal.
 
-Mudah is a TypeScript-first framework for building CLI applications that feel like premium desktop software: animated spinners, live task trees, themed panels, semantic prompts, and desktop notifications — on Node ≥ 26 and Bun, with zero runtime dependencies by default. GPU shaders are an optional extra (`@mudah-cli/vgpu`).
+Mudah is a TypeScript-first framework for building CLI applications that feel like premium desktop software: animated spinners, live task trees, themed panels, semantic prompts, and desktop notifications — on Node ≥ 26 and Bun, with zero runtime dependencies by default. GPU shaders (`@mudah-cli/vgpu`) and OS audio (`@mudah-cli/audio`) are optional extras.
 
 ```sh
 npm create @mudah-cli/mudah my-app
@@ -21,7 +21,7 @@ npm run start
 
 - **Service-provider architecture, CLI-grade speed.** Service container, two-phase provider boot (`register` → `boot`), lazy providers, and command auto-discovery — the same mental model as pondoknusa, tuned for sub-150 ms cold starts.
 - **Built for Ghostty, Kitty, and friends.** Capability detection drives everything: truecolor, unicode, OSC 9 desktop notifications, OSC 10/11 theme query, OSC 133 semantic prompts, reduced-motion respect.
-- **ESM-only, TypeScript 7, zero third-party runtime deps.** The framework ships as focused packages; your app depends on one (`@mudah-cli/mudah`). GPU shaders live in optional `@mudah-cli/vgpu`.
+- **ESM-only, TypeScript 7, zero third-party runtime deps.** The framework ships as focused packages; your app depends on one (`@mudah-cli/mudah`). GPU shaders live in optional `@mudah-cli/vgpu`. OS mixer audio lives in optional `@mudah-cli/audio`.
 - **Testable by construction.** `TestApp` runs your real commands in-process with captured output and chained assertions — no pty tricks.
 
 ## Quick start
@@ -128,6 +128,7 @@ Pass a schema as the first argument and a bad value fails at import with every o
 | `@mudah-cli/console` | Signatures, `Command`, grouped names (`db:status`), prompts (select/multiselect/password), the console kernel, help rendering |
 | `@mudah-cli/tui` | Full-screen apps: alt-buffer `Program`, diff renderer, tables, panels, viewports, mouse, Kitty keyboard, focus-managed widgets |
 | `@mudah-cli/vgpu` | Optional. Run [vgpu](https://vgpu.sh/) WGSL effects and blit the pixels to the terminal (Kitty graphics, half-block fallback) |
+| `@mudah-cli/audio` | Optional. Play PCM through the OS mixer (streaming output, one-shot WAV). Kitty cannot carry audio |
 | `@mudah-cli/testing` | `TestApp` — in-process command dispatch with chained assertions |
 | `@mudah-cli/mudah` | Umbrella + `run()` entrypoint and built-in commands |
 | `@mudah-cli/create-mudah` | The scaffolder (`npm create @mudah-cli/mudah`) |
@@ -142,6 +143,7 @@ Every package has its own npm name and depends on as little as possible, so you 
 - **Spinning progress in an existing script?** `@mudah-cli/animation` gives you `Spinner`/`ProgressBar`/`TaskRunner` with two dependencies and zero setup.
 - **Parse modern key input?** `@mudah-cli/terminal` is standalone: capability detection, OSC emitters, `KeyParser`, mouse, Kitty graphics, Kitty key-up.
 - **GPU shaders in the terminal?** `@mudah-cli/vgpu` runs a WGSL effect through [vgpu](https://vgpu.sh/) and blits the pixels. The umbrella does not depend on it.
+- **Sound from a CLI or a game loop?** `@mudah-cli/audio` writes PCM to PipeWire / Pulse / ALSA (or a native RtAudio peer). The umbrella does not depend on it. Kitty has no PCM protocol.
 - **Your own command runner?** Skip `@mudah-cli/console`'s kernel and use just `parseSignature`/`parseInput`, or drop the whole layer and drive `Application` (the container + provider lifecycle) directly as a library.
 - **Go lower still:** `@mudah-cli/container` and `@mudah-cli/config` have no Mudah dependencies at all — use them in any TypeScript project.
 - **Full TUI without the framework?** `@mudah-cli/tui` mounts a `Program` on any streams you hand it: `new Program({ stdout, stdin })`. Nothing requires the `mudah` umbrella or a `mudah.json`.
@@ -166,6 +168,20 @@ node bin/deploy.js dashboard          # full-screen TUI; esc to exit
 ```sh
 cd examples/shader-lab
 node bin/shader-lab.js
+```
+
+**[examples/tone](examples/tone)** — streaming sine through the OS mixer. `@mudah-cli/audio` writes PCM. Hold space to raise pitch. `1` queues a blip:
+
+```sh
+cd examples/tone
+node bin/tone.js
+```
+
+**[examples/melody](examples/melody)** — public-domain tunes through the OS mixer. Starts with Beethoven's Ode to Joy. `1` / `2` / `3` switch tunes. Space pauses:
+
+```sh
+cd examples/melody
+node bin/melody.js
 ```
 
 **[examples/convert-img](examples/convert-img)** — the ultimate image converter, both a CLI and a TUI, with zero npm dependencies beyond `@mudah-cli/mudah`:
@@ -270,8 +286,8 @@ This repo runs on Bun for the dev loop (`bun install`, `bun x vitest`) and Node 
 Releases are manual — there is no CI auto-publish.
 
 ```sh
-node scripts/release.mjs 0.1.0 --dry-run
-node scripts/release.mjs 0.1.0
+node scripts/release.mjs 0.5.0 --dry-run
+node scripts/release.mjs 0.5.0
 npm publish --workspaces --access public
 ```
 

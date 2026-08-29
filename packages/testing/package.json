@@ -1,6 +1,6 @@
 {
   "name": "@mudah-cli/testing",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "In-process command test runner with captured output, mocked prompts, and JSON assertions.",
   "type": "module",
   "license": "MIT",
@@ -18,12 +18,12 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/animation": "^0.4.0",
-    "@mudah-cli/console": "^0.4.0",
-    "@mudah-cli/core": "^0.4.0",
-    "@mudah-cli/terminal": "^0.4.0",
-    "@mudah-cli/tui": "^0.4.0",
-    "@mudah-cli/ui": "^0.4.0"
+    "@mudah-cli/animation": "^0.5.0",
+    "@mudah-cli/console": "^0.5.0",
+    "@mudah-cli/core": "^0.5.0",
+    "@mudah-cli/terminal": "^0.5.0",
+    "@mudah-cli/tui": "^0.5.0",
+    "@mudah-cli/ui": "^0.5.0"
   },
   "publishConfig": {
     "access": "public"

@@ -1,0 +1,9 @@
+{
+  "name": "tone",
+  "version": "0.5.0",
+  "bin": "tone",
+  "description": "Streaming sine playground for @mudah-cli/audio",
+  "ui": {
+    "theme": "auto"
+  }
+}

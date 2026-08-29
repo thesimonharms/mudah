@@ -1,24 +1,24 @@
 {
-  "name": "shader-lab",
-  "version": "0.3.0",
+  "name": "melody",
+  "version": "0.5.0",
   "private": true,
-  "description": "Live WGSL playground — Mudah + vgpu effects in the terminal.",
+  "description": "Public-domain melodies through the OS mixer — Mudah + @mudah-cli/audio.",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "shader-lab": "./bin/shader-lab.js"
+    "melody": "./bin/melody.js"
   },
   "engines": {
     "node": ">=26"
   },
   "scripts": {
-    "start": "node bin/shader-lab.js",
+    "start": "node bin/melody.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mudah-cli/mudah": "^0.5.0",
-    "@mudah-cli/vgpu": "^0.5.0"
+    "@mudah-cli/audio": "^0.5.0",
+    "@mudah-cli/mudah": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

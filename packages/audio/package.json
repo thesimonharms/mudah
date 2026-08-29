@@ -1,0 +1,31 @@
+{
+  "name": "@mudah-cli/audio",
+  "version": "0.5.0",
+  "description": "Play PCM through the OS mixer from a Mudah app (streaming output and one-shot WAV). Optional: apps that never import it never load an audio backend.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=26"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "peerDependencies": {
+    "audify": "^1.10.0"
+  },
+  "peerDependenciesMeta": {
+    "audify": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

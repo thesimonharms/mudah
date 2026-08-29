@@ -8,6 +8,7 @@ import { EventBus } from './events.js';
 import { loadManifest, type MudahManifest } from './manifest.js';
 import { discoverPlugins, type PluginDiscoveryOptions, type PluginInfo } from './plugins.js';
 import { ServiceProvider } from './service-provider.js';
+import { installTsJsResolveHook } from './ts-js-hook.js';
 
 export type ProviderClass = new (app: Application) => ServiceProvider;
 
@@ -89,6 +90,7 @@ export class Application extends Container {
 
   constructor(basePath: string = process.cwd(), manifest?: MudahManifest) {
     super();
+    installTsJsResolveHook();
     this.basePath = basePath;
     this.manifest = manifest ?? loadManifest(basePath);
     this.singleton('app', () => this);

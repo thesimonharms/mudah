@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdir, readFile, rm, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scaffold, slugify } from '@mudah-cli/create-mudah';
+
+const createVersion = (
+  JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const outDir = join(testDir, '.fixtures', 'out');
@@ -53,7 +59,7 @@ describe('scaffold', () => {
       dependencies: Record<string, string>;
     };
     expect(pkg.bin['demo-app']).toBe('./bin/demo-app.js');
-    expect(pkg.dependencies['@mudah-cli/mudah']).toBe('^0.1.0');
+    expect(pkg.dependencies['@mudah-cli/mudah']).toBe(`^${createVersion}`);
 
     const manifest = JSON.parse(await readFile(join(dir, 'mudah.json'), 'utf8')) as {
       name: string;
