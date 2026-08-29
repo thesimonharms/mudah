@@ -1,6 +1,6 @@
 {
   "name": "@mudah-cli/audio",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Play PCM through the OS mixer from a Mudah app (streaming output and one-shot WAV). Optional: apps that never import it never load an audio backend.",
   "type": "module",
   "license": "MIT",
