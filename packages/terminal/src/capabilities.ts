@@ -19,6 +19,11 @@ export interface TerminalCapabilities {
   readonly osc9: boolean;
   /** OSC 133 semantic prompt markers (Kitty, WezTerm, iTerm2, VS Code, foot). */
   readonly osc133: boolean;
+  /**
+   * The terminal answers OSC 10/11 color queries, so its theme can be read
+   * at runtime. Everything modern does; dumb terminals and CI do not.
+   */
+  readonly themeQuery: boolean;
   /** Cursor show/hide is safe. */
   readonly cursorControl: boolean;
   /** Best-guess terminal theme. */
@@ -82,6 +87,7 @@ export function detectCapabilities(options: DetectCapabilitiesOptions = {}): Ter
     osc9: brand === 'ghostty' || brand === 'wezterm',
     osc133:
       brand === 'kitty' || brand === 'wezterm' || brand === 'iterm' || brand === 'vscode' || brand === 'foot',
+    themeQuery: isTty && brand !== 'apple-terminal' && env['TERM'] !== 'dumb',
     cursorControl: isTty,
     theme: overrides.theme ?? 'unknown',
     width: options.width ?? process.stdout.columns ?? 80,

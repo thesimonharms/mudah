@@ -10,6 +10,7 @@
       "@mudah-cli/mudah/ui": ["./packages/mudah/src/ui.ts"],
       "@mudah-cli/mudah/terminal": ["./packages/mudah/src/terminal.ts"],
       "@mudah-cli/mudah/animation": ["./packages/mudah/src/animation.ts"],
+      "@thesimonharms/deploy-audit": ["./examples/deploy-audit-plugin/src/index.ts"],
       "@mudah-cli/create-mudah": ["./packages/create-mudah/src/index.ts"]
     }
   },
@@ -18,6 +19,7 @@
     "./packages/*/test",
     "./examples/*/src",
     "./examples/*/test",
+    "./examples/*/config",
     "./vitest.config.ts"
   ]
 }

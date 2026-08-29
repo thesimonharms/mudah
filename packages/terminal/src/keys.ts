@@ -1,4 +1,5 @@
 import type { ReadStream } from 'node:tty';
+import { isMouseEvent } from './mouse.js';
 
 export type KeyName =
   | 'up'
@@ -33,6 +34,7 @@ export interface KeyEvent {
  */
 export function parseKeys(buffer: string): KeyEvent[] {
   const events: KeyEvent[] = [];
+  if (isMouseEvent(buffer)) return events;
   let i = 0;
 
   while (i < buffer.length) {
@@ -152,6 +154,11 @@ export class KeyParser {
     if (safe < 0) return [];
     const ready = this.pending.slice(0, safe);
     this.pending = this.pending.slice(safe);
+
+    // A complete mouse report produces no key events but must not linger:
+    // leaving it in `pending` would corrupt the next chunk's parse.
+    if (isMouseEvent(ready)) return [];
+
     return parseKeys(ready);
   }
 
@@ -160,6 +167,18 @@ export class KeyParser {
     const esc = text.lastIndexOf('\x1b');
     if (esc < 0) return text.length;
     const rest = text.slice(esc + 1);
+    // Mouse reports carry their own terminator; wait for it rather than
+    // leaking half a click as a stray escape key. SGR is itself a CSI
+    // sequence, so it must be checked before the generic CSI branch below.
+    if (rest.startsWith('[<')) {
+      return /^\[<\d+;\d+;\d+[Mm]$/.test(rest) ? text.length : -1;
+    }
+    if (rest.startsWith('[') && /\d+;\d+;\d+M$/.test(rest)) {
+      return text.length; // urxvt 1015
+    }
+    if (rest.startsWith('M')) {
+      return /^M[\x20-\x7f]{3}$/.test(rest) ? text.length : -1;
+    }
     if (rest.length === 0) {
       // Trailing lone ESC at a chunk boundary: terminals deliver CSI
       // sequences as single reads, so a bare ESC here IS the escape key.

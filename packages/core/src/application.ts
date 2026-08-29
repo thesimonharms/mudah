@@ -6,6 +6,7 @@ import { ConfigRepository } from '@mudah-cli/config';
 import { Container, isClassLike, type Abstract, type Constructor } from '@mudah-cli/container';
 import { EventBus } from './events.js';
 import { loadManifest, type MudahManifest } from './manifest.js';
+import { discoverPlugins, type PluginDiscoveryOptions, type PluginInfo } from './plugins.js';
 import { ServiceProvider } from './service-provider.js';
 
 export type ProviderClass = new (app: Application) => ServiceProvider;
@@ -24,6 +25,28 @@ interface LazyRegistration {
   options: LazyProviderOptions;
 }
 
+export interface BootOptions {
+  /** Collect per-hook timings (default: honors `MUDAH_BOOT_PROFILE=1`). */
+  profile?: boolean;
+}
+
+/** One provider hook, timed. */
+export interface ProviderTiming {
+  /** Provider class name. */
+  readonly provider: string;
+  /** Which phase of the two-phase boot. */
+  readonly hook: 'register' | 'boot';
+  readonly durationMs: number;
+}
+
+/** Provider boot timings, for `--profile`. */
+export interface BootProfile {
+  /** Wall-clock time across both phases. */
+  readonly totalMs: number;
+  /** Timings in execution order: all `register` hooks, then all `boot` hooks. */
+  readonly providers: readonly ProviderTiming[];
+}
+
 /** A command module: a module whose default export is a command class. */
 export interface CommandModule {
   default: CommandClass;
@@ -35,6 +58,11 @@ export interface CommandShape {
   signature?: string;
   description?: string;
   handle: (...args: unknown[]) => unknown;
+}
+
+/** Round to whole milliseconds — sub-ms noise tells us nothing here. */
+function round(ms: number): number {
+  return Math.round(ms);
 }
 
 /** True when the value is a class with a `handle` prototype method. */
@@ -96,34 +124,52 @@ export class Application extends Container {
    * 1. `register()` — container bindings
    * 2. `boot()` — everything else
    *
-   * Set `MUDAH_BOOT_PROFILE=1` to print per-hook timings on stderr.
+   * Returns per-hook timings when profiling is on (`{ profile: true }`, or
+   * `MUDAH_BOOT_PROFILE=1`). The env var also prints the old one-line report
+   * to stderr for anyone scripting against it.
    */
-  async boot(): Promise<void> {
-    if (this.booted) return;
+  async boot(options: BootOptions = {}): Promise<BootProfile | undefined> {
+    // Boot is idempotent: providers already ran, so there is nothing to time.
+    if (this.booted) return undefined;
 
-    const profile = process.env['MUDAH_BOOT_PROFILE'] === '1';
-    const timings: string[] = [];
+    const profile = options.profile ?? process.env['MUDAH_BOOT_PROFILE'] === '1';
+    const hooks: ProviderTiming[] = [];
     const started = performance.now();
 
     for (const Provider of this.providers) {
       const provider = new Provider(this);
       const t0 = profile ? performance.now() : 0;
       await provider.register?.();
-      if (profile) timings.push(`${Provider.name}.register=${Math.round(performance.now() - t0)}ms`);
+      if (profile) {
+        hooks.push({ provider: Provider.name, hook: 'register', durationMs: round(performance.now() - t0) });
+      }
     }
     for (const Provider of this.providers) {
       const provider = new Provider(this);
       const t0 = profile ? performance.now() : 0;
       await provider.boot?.();
-      if (profile) timings.push(`${Provider.name}.boot=${Math.round(performance.now() - t0)}ms`);
-    }
-
-    if (profile) {
-      console.error(`[boot-profile] total=${Math.round(performance.now() - started)}ms ${timings.join(' ')}`);
+      if (profile) {
+        hooks.push({ provider: Provider.name, hook: 'boot', durationMs: round(performance.now() - t0) });
+      }
     }
 
     this.booted = true;
     await this.events().emit('app.booted', { app: this });
+
+    if (!profile) return undefined;
+
+    const result: BootProfile = {
+      totalMs: round(performance.now() - started),
+      providers: hooks,
+    };
+    if (process.env['MUDAH_BOOT_PROFILE'] === '1') {
+      console.error(
+        `[boot-profile] total=${result.totalMs}ms ${hooks
+          .map((h) => `${h.provider}.${h.hook}=${h.durationMs}ms`)
+          .join(' ')}`,
+      );
+    }
+    return result;
   }
 
   /** Boot lazy providers that declared an interest in `command`. */
@@ -179,6 +225,22 @@ export class Application extends Container {
       }
     }
     return this;
+  }
+
+  /**
+   * Discover plugins among installed packages and register what they
+   * provide. A plugin is any dependency declaring the `mudah-plugin`
+   * keyword; see {@link discoverPlugins}.
+   *
+   * Broken plugins are skipped rather than fatal — a third-party package
+   * must never be able to take down the host app at boot.
+   */
+  async discoverPlugins(options: PluginDiscoveryOptions = {}): Promise<PluginInfo[]> {
+    const plugins = await discoverPlugins(this.basePath, options);
+    for (const plugin of plugins) {
+      for (const provider of plugin.providers) this.register(provider);
+    }
+    return plugins;
   }
 
   /**

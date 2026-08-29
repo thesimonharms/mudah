@@ -1,0 +1,10 @@
+{
+  "name": "deploy-console",
+  "version": "0.1.0",
+  "bin": "deploy",
+  "description": "Deployment console built on Mudah",
+  "ui": {
+    "theme": "auto"
+  },
+  "updates": true
+}

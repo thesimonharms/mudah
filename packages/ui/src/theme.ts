@@ -1,3 +1,5 @@
+import { queryTerminalTheme, type OscWriter, type ThemeQueryInput } from '@mudah-cli/terminal';
+
 export interface ThemeColors {
   /** Primary brand accent (headings, highlights). */
   accent: string;
@@ -57,9 +59,55 @@ export const themes: Record<string, Theme> = {
 
 /**
  * Resolve a theme by name. `'auto'` falls back to dark mode (the safe
- * default for CLI tools); a runtime OSC 10 query can refine this in v0.2.
+ * default for CLI tools) — use `detectTheme()` when you want the terminal's
+ * real colors to decide.
  */
 export function resolveTheme(name: string | undefined): Theme {
   if (name === undefined || name === 'auto') return sleekDark;
   return themes[name] ?? sleekDark;
+}
+
+export interface DetectThemeOptions {
+  /**
+   * Theme name. Only `'auto'` triggers a terminal query — an explicit name
+   * (and `undefined`) resolve synchronously, keeping cold start untouched.
+   */
+  name?: string;
+  /**
+   * Skip the query entirely (non-interactive runs, tests). Defaults to
+   * `process.stdin.isTTY`.
+   */
+  allowQuery?: boolean;
+  /** How long to wait for the terminal's answer. */
+  timeoutMs?: number;
+  /** Stream the query is written to (default `process.stdout`). */
+  stdout?: OscWriter;
+  /** Stream the answer is read from (default `process.stdin`). */
+  stdin?: ThemeQueryInput;
+}
+
+/**
+ * Resolve the theme, asking the terminal for its colors when the manifest
+ * asks for `'auto'`. Every other name resolves synchronously, and any run
+ * that can't answer (no TTY, timeout, silent terminal) falls back to dark.
+ * Never throws.
+ */
+export async function detectTheme(options: DetectThemeOptions = {}): Promise<Theme> {
+  const name = options.name;
+  if (name !== 'auto') return resolveTheme(name);
+
+  const allowQuery = options.allowQuery ?? process.stdin.isTTY === true;
+  if (!allowQuery) return sleekDark;
+
+  try {
+    const result = await queryTerminalTheme({
+      timeoutMs: options.timeoutMs,
+      stdout: options.stdout,
+      stdin: options.stdin,
+    });
+    if (!result.ok) return sleekDark;
+    return result.theme === 'light' ? sleekLight : sleekDark;
+  } catch {
+    return sleekDark;
+  }
 }

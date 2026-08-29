@@ -1,4 +1,12 @@
-import { enterRawMode, KeyParser, type KeyEvent } from '@mudah-cli/terminal';
+import {
+  enterRawMode,
+  KeyParser,
+  parseMouseEvents,
+  disableMouse,
+  enableMouse,
+  type KeyEvent,
+  type MouseModeOptions,
+} from '@mudah-cli/terminal';
 import { ScreenBuffer } from './screen-buffer.js';
 import { DiffRenderer } from './diff-renderer.js';
 import type { Component } from './component.js';
@@ -13,6 +21,12 @@ export interface ProgramOptions {
   frameMs?: number;
   /** Disable the alternate screen buffer (inline rendering). */
   inline?: boolean;
+  /**
+   * Enable mouse reporting: clicks, drags, and the wheel, routed to the
+   * component under the cursor. Default false, since it takes over the
+   * terminal's own text selection.
+   */
+  mouse?: boolean | MouseModeOptions;
 }
 
 /**
@@ -35,6 +49,7 @@ export class Program {
   private readonly stdin?: NodeJS.ReadStream;
   private readonly frameMs: number;
   private readonly inline: boolean;
+  private readonly mouse: MouseModeOptions | false;
 
   private container: Container | undefined;
   private readonly renderer = new DiffRenderer();
@@ -51,6 +66,7 @@ export class Program {
     this.stdin = options.stdin;
     this.frameMs = options.frameMs ?? 16;
     this.inline = options.inline ?? false;
+    this.mouse = options.mouse === true ? {} : options.mouse === undefined ? false : options.mouse;
   }
 
   /** Set (or replace) the component tree. */
@@ -85,11 +101,13 @@ export class Program {
       }
       if (tty) {
         this.stdout.write('\x1b[?25l'); // hide cursor
+        if (this.mouse !== false) this.stdout.write(enableMouse(this.mouse));
         this.exitRaw = enterRawMode(this.stdin!);
         this.dataListener = (chunk): void => {
           for (const event of this.parser.feed(String(chunk))) {
             this.handleKey(event);
           }
+          if (this.mouse !== false) this.handleMouse(String(chunk));
         };
         this.stdin!.on('data', this.dataListener);
       }
@@ -129,6 +147,15 @@ export class Program {
     this.requestFrame();
   }
 
+  /** Route mouse reports to the component under the cursor. */
+  private handleMouse(chunk: string): void {
+    const events = parseMouseEvents(chunk);
+    if (events.length === 0) return;
+    for (const event of events) {
+      if (this.container?.handleMouse(event)) this.requestFrame();
+    }
+  }
+
   private paint(): void {
     if (!this.container) return;
     const width = (this.stdout as { columns?: number }).columns ?? 80;
@@ -155,6 +182,7 @@ export class Program {
     const tty = this.stdin?.isTTY === true && this.stdout.isTTY === true;
     let out = '';
     if (!this.inline && tty) out += '\x1b[?1049l';
+    if (this.mouse !== false && tty) out += disableMouse(this.mouse);
     out += '\x1b[?25h'; // show cursor
     this.stdout.write(out);
     this.running = false;

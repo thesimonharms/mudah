@@ -1,17 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import type { KeyEvent } from '@mudah-cli/terminal';
+import type { KeyEvent, MouseEvent } from '@mudah-cli/terminal';
 import {
   Container,
   DiffRenderer,
   Label,
   List,
   MultiList,
+  Panel,
   Program,
   ScreenBuffer,
+  Table,
   TextInput,
+  Viewport,
 } from '@mudah-cli/tui';
 
 const key = (name: string, ch?: string): KeyEvent => ({ name, ch });
+
+const click = (x: number, y: number): MouseEvent => ({
+  x,
+  y,
+  buttons: { left: true, middle: false, right: false, extra: false },
+  hover: false,
+  release: false,
+  drag: false,
+  shift: false,
+  alt: false,
+  ctrl: false,
+});
+
+const wheel = (direction: 'up' | 'down'): MouseEvent => ({
+  x: 0,
+  y: 0,
+  buttons: { left: false, middle: false, right: false, extra: false },
+  hover: false,
+  release: false,
+  drag: false,
+  shift: false,
+  alt: false,
+  ctrl: false,
+  wheel: direction,
+});
 
 describe('ScreenBuffer', () => {
   it('sets cells and renders trimmed rows', () => {
@@ -245,5 +273,195 @@ describe('Program (headless)', () => {
     expect(code).toBe(0);
     expect(session.out()).toContain('before');
     expect(session.out()).toContain('after');
+  });
+});
+
+describe('Table', () => {
+  const columns = [{ header: 'name' }, { header: 'size', align: 'right' as const }];
+  const rows = [
+    ['alpha', '10'],
+    ['beta', '20'],
+    ['gamma', '30'],
+  ];
+
+  it('renders a grid with a selection marker', () => {
+    const table = new Table(columns, rows);
+    const rendered = table.render();
+    expect(rendered.join('\n')).toContain('name');
+    expect(rendered.join('\n')).toContain('beta');
+    expect(rendered.some((line) => line.includes('▸'))).toBe(true);
+  });
+
+  it('moves the selection with the arrow keys', () => {
+    const table = new Table(columns, rows);
+    expect(table.selectedIndex).toBe(0);
+    table.onKey(key('down'));
+    expect(table.selectedIndex).toBe(1);
+    table.onKey(key('up'));
+    expect(table.selectedIndex).toBe(0);
+  });
+
+  it('stops at the ends', () => {
+    const table = new Table(columns, rows);
+    table.onKey(key('up'));
+    expect(table.selectedIndex).toBe(0);
+    table.selectedIndex = rows.length - 1;
+    table.onKey(key('down'));
+    expect(table.selectedIndex).toBe(rows.length - 1);
+  });
+
+  it('reports the selected row on enter', () => {
+    const picked: number[] = [];
+    const table = new Table(columns, rows, (index) => picked.push(index));
+    table.onKey(key('down'));
+    table.onKey(key('enter'));
+    expect(picked).toEqual([1]);
+  });
+
+  it('scrolls with the mouse wheel', () => {
+    const table = new Table(columns, rows);
+    expect(table.onMouse(wheel('down'))).toBe(true);
+    expect(table.selectedIndex).toBe(1);
+    expect(table.onMouse(wheel('up'))).toBe(true);
+    expect(table.selectedIndex).toBe(0);
+  });
+
+  it('selects the row that was clicked', () => {
+    const table = new Table(columns, rows);
+    // Row 0 is the top border, 1 the header, 2 the rule: row 3 is data 0.
+    expect(table.onMouse(click(0, 4))).toBe(true);
+    expect(table.selectedIndex).toBe(1);
+  });
+
+  it('clamps clicks outside the data area', () => {
+    const table = new Table(columns, rows);
+    expect(table.onMouse(click(0, 0))).toBe(false);
+    expect(table.selectedIndex).toBe(0);
+  });
+
+  it('windows long tables to the viewport height', () => {
+    const many = Array.from({ length: 50 }, (_, i) => [`row-${i}`, `${i}`]);
+    const table = new Table(columns, many);
+    table.viewportHeight = 8;
+    expect(table.render().length).toBeLessThanOrEqual(8);
+    table.selectedIndex = 40;
+    const rendered = table.render().join('\n');
+    expect(rendered).toContain('row-40');
+    expect(rendered).not.toContain('row-0');
+  });
+});
+
+describe('Panel', () => {
+  it('draws a titled box', () => {
+    const panel = new Panel('Deploy', ['staging', 'production']);
+    const rendered = panel.render().join('\n');
+    expect(rendered).toContain('Deploy');
+    expect(rendered).toContain('staging');
+    expect(rendered).toContain('production');
+  });
+
+  it('draws an untitled box', () => {
+    const rendered = new Panel(undefined, ['x']).render().join('\n');
+    expect(rendered).toContain('x');
+  });
+
+  it('is not focusable', () => {
+    expect(new Panel('t', []).focusable).toBe(false);
+  });
+
+  it('swaps its body', () => {
+    const panel = new Panel('t', ['before']);
+    panel.setBody(['after']);
+    const rendered = panel.render().join('\n');
+    expect(rendered).toContain('after');
+    expect(rendered).not.toContain('before');
+  });
+});
+
+describe('Viewport', () => {
+  const longLines = Array.from({ length: 20 }, (_, i) => `line-${i}`);
+
+  it('shows only the top slice at first', () => {
+    const viewport = new Viewport(new Label(longLines.join('\n')), 5);
+    const rendered = viewport.render();
+    expect(rendered).toEqual(['line-0', 'line-1', 'line-2', 'line-3', 'line-4']);
+  });
+
+  it('scrolls down with the arrow keys', () => {
+    const viewport = new Viewport(new Label(longLines.join('\n')), 5);
+    viewport.onKey(key('down'));
+    expect(viewport.scrollTop).toBe(1);
+    expect(viewport.render()[0]).toBe('line-1');
+  });
+
+  it('refuses to scroll past the end', () => {
+    const viewport = new Viewport(new Label(longLines.join('\n')), 5);
+    expect(viewport.maxScroll).toBe(15);
+    viewport.onKey(key('end'));
+    expect(viewport.scrollTop).toBe(15);
+    viewport.onKey(key('down'));
+    expect(viewport.scrollTop).toBe(15);
+  });
+
+  it('pages and jumps home', () => {
+    const viewport = new Viewport(new Label(longLines.join('\n')), 5);
+    viewport.onKey(key('page-down'));
+    expect(viewport.scrollTop).toBe(5);
+    viewport.onKey(key('home'));
+    expect(viewport.scrollTop).toBe(0);
+  });
+
+  it('scrolls with the wheel', () => {
+    const viewport = new Viewport(new Label(longLines.join('\n')), 5);
+    expect(viewport.onMouse(wheel('down'))).toBe(true);
+    expect(viewport.scrollTop).toBe(1);
+    expect(viewport.onMouse(wheel('up'))).toBe(true);
+    expect(viewport.scrollTop).toBe(0);
+  });
+
+  it('always fills its declared height', () => {
+    const viewport = new Viewport(new Label('only-one'), 4);
+    expect(viewport.render()).toHaveLength(4);
+  });
+
+  it('reports its height for layout', () => {
+    expect(new Viewport(new Label('x'), 7).height).toBe(7);
+  });
+
+  it('forwards unhandled keys to its child', () => {
+    const list = new List(['a', 'b']);
+    const viewport = new Viewport(list, 5);
+    expect(viewport.onKey(key('enter'))).toBe(true);
+  });
+
+  it('resizes without losing the scroll position', () => {
+    const viewport = new Viewport(new Label(longLines.join('\n')), 5);
+    viewport.scrollTo(10);
+    viewport.setHeight(8);
+    expect(viewport.render()).toHaveLength(8);
+    expect(viewport.scrollTop).toBe(10);
+  });
+});
+
+describe('mouse routing', () => {
+  it('delivers a click to the child under the cursor', () => {
+    const list = new List(['a', 'b', 'c']);
+    const container = new Container().add(new Label('header'), list);
+    // The label occupies row 0, so the list starts at row 1.
+    expect(container.handleMouse(click(0, 2))).toBe(false);
+    expect(list.selectedIndex).toBe(0);
+  });
+
+  it('translates coordinates into the child space', () => {
+    const table = new Table([{ header: 'name' }], [['a'], ['b'], ['c']]);
+    const container = new Container().add(new Label('header'), table);
+    // Table starts at row 1, so its local row 3 (data 0) is global row 4.
+    container.handleMouse(click(0, 4));
+    expect(table.selectedIndex).toBe(0);
+  });
+
+  it('ignores clicks below every child', () => {
+    const container = new Container().add(new Label('only'));
+    expect(container.handleMouse(click(0, 50))).toBe(false);
   });
 });

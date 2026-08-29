@@ -31,19 +31,49 @@ export function formatCommandRow(entry: CommandEntry, width: number): string {
   return `  ${padded} ${entry.description}`;
 }
 
-/** Render the full command list. */
+/** Render the full command list, with grouped commands under headers. */
 export function renderCommandList(appName: string, version: string, entries: CommandEntry[], lines: string[]): void {
   lines.push(`${appName} v${version}`, '');
   if (entries.length === 0) {
     lines.push('No commands registered.');
     return;
   }
-  lines.push('Commands:');
+
+  const grouped = groupEntries(entries);
+  const ungrouped = entries.filter((entry) => entry.group === undefined);
   const width = Math.max(...entries.map((e) => visibleLength(e.name))) + 2;
-  for (const entry of entries) {
-    lines.push(formatCommandRow(entry, width));
+
+  if (ungrouped.length > 0) {
+    lines.push('Commands:');
+    for (const entry of ungrouped) {
+      lines.push(formatCommandRow(entry, width));
+    }
+    lines.push('');
   }
-  lines.push('', `Use "${appName} <command> --help" for command details.`);
+
+  for (const [name, commands] of grouped) {
+    lines.push(`${name}:`);
+    for (const entry of commands) {
+      lines.push(formatCommandRow(entry, width));
+    }
+    lines.push('');
+  }
+
+  // A trailing blank line always precedes the footer.
+  if (ungrouped.length === 0 && grouped.length > 0) lines.pop();
+  lines.push(`Use "${appName} <command> --help" for command details.`);
+}
+
+/** Bucket grouped entries by namespace, in first-seen order. */
+function groupEntries(entries: CommandEntry[]): Array<[string, CommandEntry[]]> {
+  const buckets = new Map<string, CommandEntry[]>();
+  for (const entry of entries) {
+    if (entry.group === undefined) continue;
+    const bucket = buckets.get(entry.group);
+    if (bucket === undefined) buckets.set(entry.group, [entry]);
+    else bucket.push(entry);
+  }
+  return [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
 /** Render single-command help. */

@@ -20,7 +20,7 @@ npm run start
 ## Why Mudah
 
 - **Service-provider architecture, CLI-grade speed.** Service container, two-phase provider boot (`register` → `boot`), lazy providers, and command auto-discovery — the same mental model as pondoknusa, tuned for sub-150 ms cold starts.
-- **Built for Ghostty, Kitty, and friends.** Capability detection drives everything: truecolor, unicode, OSC 9 desktop notifications, OSC 133 semantic prompts, reduced-motion respect.
+- **Built for Ghostty, Kitty, and friends.** Capability detection drives everything: truecolor, unicode, OSC 9 desktop notifications, OSC 10/11 theme query, OSC 133 semantic prompts, reduced-motion respect.
 - **ESM-only, TypeScript 7, zero third-party runtime deps.** The framework ships as 10 focused packages; your app depends on one (`@mudah-cli/mudah`).
 - **Testable by construction.** `TestApp` runs your real commands in-process with captured output and chained assertions — no pty tricks.
 
@@ -74,7 +74,9 @@ export default class DeployCommand extends Command {
 }
 ```
 
-Signatures are string-based: `{required}`, `{optional?}`, `{name=default}`, `[--flag]`, `[--opt=value]`. The kernel parses, validates, and injects `input` for you. Unknown options, missing required args, and excess positionals become usage errors (exit 2) automatically.
+Signatures are string-based: `{required}`, `{optional?}`, `{name=default}`, `[--flag]`, `[--opt=value]`. A colon in the name (`db:status`) puts the command in a group. The kernel parses, validates, and injects `input` for you. Unknown options, missing required args, and excess positionals become usage errors (exit 2) automatically.
+
+Set `groupDescription` on any command in the group to label it in `--help`. A bare namespace (`deploy`) runs `deploy:default` when that command exists.
 
 ### Providers
 
@@ -97,28 +99,34 @@ Two-phase boot runs every `register()` first, then every `boot()` — so `boot()
 
 ```ts
 // config/db.ts
-import { defineConfig } from '@mudah-cli/mudah';
+import { defineConfig, env, s } from '@mudah-cli/mudah';
 
-export default defineConfig({
-  url: env('DATABASE_URL', 'sqlite:///local.db'),
-  pool: env('DB_POOL', 5),
-});
+export default defineConfig(
+  s.object({
+    url: s.string(),
+    pool: s.number().min(1).default(5),
+  }),
+  {
+    url: env('DATABASE_URL', 'sqlite:///local.db'),
+    pool: env('DB_POOL', 5),
+  },
+);
 ```
 
-`app.config().get('db.pool')` reads dotted keys; `mergeConfigFrom` in providers merges defaults under existing values (existing wins). `.env` loading is native (`process.loadEnvFile`) with typed parsing in `env()`.
+Pass a schema as the first argument and a bad value fails at import with every offending key listed. `app.config().validate('db', schema)` re-checks a subtree at boot. `app.config().get('db.pool')` reads dotted keys. `mergeConfigFrom` in providers merges defaults under existing values (existing wins). `.env` loading is native (`process.loadEnvFile`) with typed parsing in `env()`.
 
 ## Packages
 
 | Package | Purpose |
 | --- | --- |
 | `@mudah-cli/container` | High-performance IoC: bindings, singletons, constructor auto-injection, contextual bindings |
-| `@mudah-cli/config` | Dotted-key config repository, `.env` handling, typed accessors |
-| `@mudah-cli/terminal` | Capability detection, OSC emitters, ANSI helpers, key parsing |
+| `@mudah-cli/config` | Dotted-key config repository, `.env` handling, typed accessors, schema validation |
+| `@mudah-cli/terminal` | Capability detection, OSC emitters (including OSC 10/11 theme query), ANSI helpers, key and mouse parsing |
 | `@mudah-cli/animation` | Ticker, spinners, progress bars, parallel task trees |
 | `@mudah-cli/ui` | Design tokens, the `sleek` theme, Output primitives (styled/plain/json), tables, panels, markdown |
-| `@mudah-cli/core` | The kernel: `Application` (extends Container), providers, events, discovery |
-| `@mudah-cli/console` | Signatures, `Command`, prompts (select/multiselect/password), the console kernel, help rendering |
-| `@mudah-cli/tui` | Full-screen apps: alt-buffer `Program`, diff renderer, focus-managed widgets |
+| `@mudah-cli/core` | The kernel: `Application` (extends Container), providers, events, discovery, plugins, update nudge |
+| `@mudah-cli/console` | Signatures, `Command`, grouped names (`db:status`), prompts (select/multiselect/password), the console kernel, help rendering |
+| `@mudah-cli/tui` | Full-screen apps: alt-buffer `Program`, diff renderer, tables, panels, viewports, mouse, focus-managed widgets |
 | `@mudah-cli/testing` | `TestApp` — in-process command dispatch with chained assertions |
 | `@mudah-cli/mudah` | Umbrella + `run()` entrypoint and built-in commands |
 | `@mudah-cli/create-mudah` | The scaffolder (`npm create @mudah-cli/mudah`) |
@@ -131,7 +139,7 @@ Every package has its own npm name and depends on as little as possible, so you 
 
 - **Just want colors?** `npm i @mudah-cli/ui` — `paint()`, themes, tables, panels. No kernel, no CLI, no opinions about your app structure.
 - **Spinning progress in an existing script?** `@mudah-cli/animation` gives you `Spinner`/`ProgressBar`/`TaskRunner` with two dependencies and zero setup.
-- **Parse modern key input?** `@mudah-cli/terminal` is standalone: capability detection, OSC emitters, `KeyParser`.
+- **Parse modern key input?** `@mudah-cli/terminal` is standalone: capability detection, OSC emitters, `KeyParser`, mouse.
 - **Your own command runner?** Skip `@mudah-cli/console`'s kernel and use just `parseSignature`/`parseInput`, or drop the whole layer and drive `Application` (the container + provider lifecycle) directly as a library.
 - **Go lower still:** `@mudah-cli/container` and `@mudah-cli/config` have no Mudah dependencies at all — use them in any TypeScript project.
 - **Full TUI without the framework?** `@mudah-cli/tui` mounts a `Program` on any streams you hand it: `new Program({ stdout, stdin })`. Nothing requires the `mudah` umbrella or a `mudah.json`.
@@ -139,6 +147,17 @@ Every package has its own npm name and depends on as little as possible, so you 
 Conversely, the umbrella (`@mudah-cli/mudah`) is the "all the parts" install: one dependency, the whole stack wired together with `run()`, auto-discovery, and built-in commands.
 
 ## Examples
+
+**[examples/deploy-console](examples/deploy-console)** — a deployment console that uses every v0.2 and v0.3 feature: schema-validated config, grouped commands (`deploy:`, `db:`), `--profile`, OSC 10 theme query, TUI tables/panels/viewports/mouse, the update nudge, and a plugin loaded from `node_modules` (`@thesimonharms/deploy-audit` → `audit:last`):
+
+```sh
+cd examples/deploy-console
+node bin/deploy.js --help
+node bin/deploy.js deploy:run staging --dry-run
+node bin/deploy.js db:status --profile
+node bin/deploy.js audit:last
+node bin/deploy.js dashboard          # full-screen TUI; esc to exit
+```
 
 **[examples/convert-img](examples/convert-img)** — the ultimate image converter, both a CLI and a TUI, with zero npm dependencies beyond `@mudah-cli/mudah`:
 
@@ -163,7 +182,7 @@ Every app ships with:
 - `doctor` — runtime, manifest, discovery, and terminal capability report
 - `dev {command}` — watch mode: re-runs the command on changes (150 ms debounce)
 
-Global flags: `--help`, `--version`. Every command understands `--help`.
+Global flags: `--help`, `--version`, `--profile`. Every command understands `--help`. `--profile` prints boot and command timings through `Output` (a table in the terminal, a `boot` block under `--json`).
 
 Output modes work globally: `--json` emits machine-readable JSON lines plus a final `{ok, results|error}` envelope, and `--plain` strips all ANSI (log-friendly). Commands can target either mode explicitly via `this.output.isMachineReadable`.
 
@@ -180,15 +199,24 @@ const token = await this.password('API token');                          // mask
 For full-screen interfaces, build with `@mudah-cli/tui`:
 
 ```ts
-import { Program, Container, List, Label, TextInput } from '@mudah-cli/mudah/tui';
+import { Program, Container, List, Label, Panel, Table, TextInput, Viewport } from '@mudah-cli/mudah/tui';
 
-const program = new Program();
+const program = new Program({ mouse: true });
 const list = new List(items, (i) => program.quit());
-program.mount(new Container().add(new Label('Deploy'), list, new TextInput()));
+const table = new Table([{ header: 'service' }, { header: 'status' }], rows);
+program.mount(new Container().add(new Label('Deploy'), new Panel('Summary', ['ok']), new Viewport(table, 12), list, new TextInput()));
 process.exitCode = await program.run(); // alt-buffer, diff-rendered, esc to exit
 ```
 
-Widgets implement a two-method `Component` contract (`render(): string[]`, `onKey(event)`), so custom widgets are ordinary classes — focus cycling, key routing, and minimal repaints come from the container and renderer.
+Widgets implement a two-method `Component` contract (`render(): string[]`, `onKey(event)`), so custom widgets are ordinary classes — focus cycling, key routing, mouse, and minimal repaints come from the container and renderer. `Table`, `Panel`, and `Viewport` cover grids, titled boxes, and scrolling windows.
+
+### Plugins
+
+A plugin is an installed package whose `package.json` lists the `mudah-plugin` keyword. Its entry point may export a provider class (name ending in `Provider`, or a `providers` array). It may also export a `commands` array. `run()` discovers these from `node_modules` before boot. A plugin that fails to import is skipped, so a third-party package cannot take the host app down. Pass `disablePlugins: true` to skip discovery (tests, bundled apps).
+
+### Update nudge
+
+Set `"updates": true` in `mudah.json` and pass `updatePackage` to `run()` (the published npm name). On a successful TTY run, Mudah compares the running version to the registry (24h cache, 1.5s timeout). It then prints one muted line when a newer version exists. The check never throws. CI, `--json`, and `updates: false` skip it.
 
 ## Testing
 
@@ -250,8 +278,7 @@ The release script bumps all ten packages (and their internal deps) in lockstep,
 
 ## Roadmap
 
-- **v0.2** — OSC 10 runtime theme query, config schema validation, `--profile` flag, update nudge (semver check with cache).
-- **v0.3** — richer TUI widgets (tables, panels, scrolling viewports, mouse support), command grouping/namespacing, plugin providers from `node_modules`.
+v0.2 and v0.3 are in this tree: OSC 10 runtime theme query, config schema validation, `--profile`, the update nudge, TUI tables/panels/viewports/mouse, command groups, and plugin providers from `node_modules`. See [examples/deploy-console](examples/deploy-console).
 
 ## License
 

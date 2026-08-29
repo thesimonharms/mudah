@@ -38,6 +38,41 @@ export default class HelloCommand extends Command {
 `,
   );
   await writeFile(join(appDir, 'bin', 'fixture'), '#!/usr/bin/env node\nconsole.log("stub");\n');
+  await writeFile(
+    join(appDir, 'src', 'commands', 'db-migrate.command.ts'),
+    `import { Command } from '@mudah-cli/console';
+export default class DbMigrateCommand extends Command {
+  signature = 'db:migrate {step?}';
+  description = 'Run pending migrations';
+  groupDescription = 'Database operations';
+  async handle() {
+    this.output.success(\`migrated \${this.arg('step') ?? 'all'}\`);
+  }
+}
+`,
+  );
+  await writeFile(
+    join(appDir, 'src', 'commands', 'db-status.command.ts'),
+    `import { Command } from '@mudah-cli/console';
+export default class DbStatusCommand extends Command {
+  signature = 'db:status';
+  description = 'Show migration status';
+  async handle() {
+    this.output.success('up to date');
+  }
+}
+`,
+  );
+  await mkdir(join(appDir, 'src', 'providers'), { recursive: true });
+  await writeFile(
+    join(appDir, 'src', 'providers', 'FixtureProvider.ts'),
+    `import { ServiceProvider } from '@mudah-cli/core';
+export default class FixtureProvider extends ServiceProvider {
+  register(): void { this.app.singleton('fixture', () => ({ ready: true })); }
+  boot(): void { this.app.config().set('fixture.booted', true); }
+}
+`,
+  );
 });
 
 afterAll(async () => {
@@ -253,5 +288,199 @@ describe('output modes', () => {
     expect(code).toBe(0);
     expect(s.text().out).toContain('hello there');
     expect(s.text().out).not.toContain('\x1b[');
+  });
+});
+
+describe('--profile', () => {
+  it('prints a timing table without disturbing the command', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['hello', 'world', '--profile'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('hello world');
+    expect(s.text().out).toContain('stage');
+    expect(s.text().out).toContain('total');
+    expect(s.text().out).toMatch(/\d+ms/);
+  });
+
+  it('includes per-provider boot timings', async () => {
+    const s = liveStreams();
+    await run({
+      argv: ['hello', '--profile'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(s.text().out).toContain('FixtureProvider.register');
+    expect(s.text().out).toContain('FixtureProvider.boot');
+    expect(s.text().out).toContain('command hello');
+  });
+
+  it('is stripped before dispatch, so commands never see it', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['hello', '--profile'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).not.toContain('Unknown option');
+  });
+
+  it('adds a boot block to the --json envelope', async () => {
+    const s = liveStreams();
+    await run({
+      argv: ['hello', '--profile', '--json'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    const parsed = JSON.parse(s.text().out.trim().split('\n').at(-1)!) as {
+      boot?: { totalMs: number; providers: Array<{ provider: string; hook: string; durationMs: number }> };
+    };
+    expect(parsed.boot).toBeDefined();
+    expect(typeof parsed.boot?.totalMs).toBe('number');
+    const names = (parsed.boot?.providers ?? []).map((p) => `${p.provider}.${p.hook}`);
+    expect(names).toContain('FixtureProvider.register');
+    expect(names).toContain('FixtureProvider.boot');
+  });
+
+  it('omits the boot block when not profiling', async () => {
+    const s = liveStreams();
+    await run({ argv: ['hello', '--json'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    const parsed = JSON.parse(s.text().out.trim().split('\n').at(-1)!) as { boot?: unknown };
+    expect(parsed.boot).toBeUndefined();
+  });
+
+  it('stays silent without the flag', async () => {
+    const s = liveStreams();
+    await run({ argv: ['hello'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(s.text().out).not.toContain('stage');
+  });
+});
+
+describe('command grouping', () => {
+  it('dispatches a grouped command by its full name', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['db:migrate'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('migrated all');
+  });
+
+  it('passes arguments through to grouped commands', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['db:migrate', '3'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('migrated 3');
+  });
+
+  it('renders grouped commands under a header', async () => {
+    const s = liveStreams();
+    await run({ argv: ['--help'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(s.text().out).toContain('db:');
+    expect(s.text().out).toContain('db:migrate');
+    expect(s.text().out).toContain('db:status');
+  });
+
+  it('keeps ungrouped commands in the main list', async () => {
+    const s = liveStreams();
+    await run({ argv: ['--help'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    const out = s.text().out;
+    expect(out).toContain('hello');
+    expect(out).toContain('Commands:');
+  });
+
+  it('shows per-command help for a grouped command', async () => {
+    const s = liveStreams();
+    await run({
+      argv: ['db:migrate', '--help'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(s.text().out).toContain('db:migrate');
+    expect(s.text().out).toContain('Run pending migrations');
+  });
+
+  it('rejects a malformed group name at registration', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['--help'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+      commands: [
+        {
+          default: class extends Command {
+            signature = 'db:';
+            description = 'broken';
+            async handle(): Promise<void> {}
+          },
+        },
+      ],
+    });
+    // Registration failure is reported, not fatal to the whole run.
+    expect(code).toBe(0);
+    expect(s.text().err).toContain('Invalid command name');
+  });
+});
+
+describe('update nudge', () => {
+  const updatesDir = join(testDir, '.fixtures', 'cache');
+
+  afterAll(async () => {
+    await rm(updatesDir, { recursive: true, force: true });
+  });
+
+  it('stays quiet when no update package is configured', async () => {
+    const s = liveStreams();
+    await run({
+      argv: ['hello'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+      env: { ...process.env, TERM: 'xterm-256color' },
+      updatePackage: undefined,
+      updateCacheDir: updatesDir,
+    });
+    expect(s.text().out).not.toContain('Update available');
+  });
+
+  it('does not block exit when the registry is unreachable', async () => {
+    const s = liveStreams();
+    // A closed port on localhost: connection refused, no network needed.
+    const started = Date.now();
+    const code = await run({
+      argv: ['hello'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+        MUDAH_UPDATE_REGISTRY: 'http://127.0.0.1:9',
+      },
+      updatePackage: 'demo',
+      updateCacheDir: updatesDir,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('hello there');
+    // The check is bounded by its own timeout, so a dead registry can't hang.
+    expect(Date.now() - started).toBeLessThan(10_000);
   });
 });

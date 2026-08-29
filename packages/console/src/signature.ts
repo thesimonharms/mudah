@@ -41,6 +41,14 @@ export function parseSignature(signature: string): ParsedSignature {
   const firstSpace = trimmed.search(/\s/);
   result.name = firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace);
 
+  // Names are unvalidated elsewhere, so a typo like "db:" would otherwise
+  // register an unreachable command instead of failing at authoring time.
+  if (!/^[a-zA-Z][a-zA-Z0-9]*(?::[a-zA-Z][a-zA-Z0-9-]*)?$/.test(result.name)) {
+    throw new Error(
+      `[console] Invalid command name "${result.name}" in signature "${signature}". Use a name like "deploy" or a group like "db:migrate".`,
+    );
+  }
+
   let variadicIndex = -1;
   for (const match of trimmed.matchAll(/\{([^{}]+)\}/g)) {
     const inner = match[1]!;

@@ -1,0 +1,29 @@
+{
+  "name": "@thesimonharms/deploy-console",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deployment console that dogfoods Mudah v0.2 and v0.3 features.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "deploy": "./bin/deploy.js"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "start": "node bin/deploy.js",
+    "dev": "node bin/deploy.js dev dashboard",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mudah-cli/mudah": "^0.2.0",
+    "@thesimonharms/deploy-audit": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.0"
+  }
+}

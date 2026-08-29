@@ -16,6 +16,33 @@ export interface CommandEntry {
   signature: ParsedSignature;
   description: string;
   factory: () => Command;
+  /**
+   * Namespace prefix, when the name is grouped (`db:migrate` → `db`).
+   * Ungrouped commands have `group: undefined`.
+   */
+  group?: string;
+  /** Short blurb for the group, from the first command that declared one. */
+  groupDescription?: string;
+}
+
+/** A group of commands sharing a namespace. */
+export interface CommandGroup {
+  readonly name: string;
+  readonly description: string;
+  readonly commands: readonly CommandEntry[];
+}
+
+/** Split `db:migrate` into its group and short name. */
+export function splitCommandName(name: string): { group: string | undefined; name: string } {
+  const separator = name.indexOf(':');
+  if (separator <= 0) return { group: undefined, name };
+  return { group: name.slice(0, separator), name: name.slice(separator + 1) };
+}
+
+/** Read an optional `groupDescription` declared on a command instance. */
+function groupDescriptionOf(instance: Command): string | undefined {
+  const value = (instance as { groupDescription?: unknown }).groupDescription;
+  return typeof value === 'string' ? value : undefined;
 }
 
 /**
@@ -55,12 +82,19 @@ export class ConsoleKernel {
     if (this.commands.has(signature.name)) {
       throw new Error(`[console] Duplicate command name "${signature.name}".`);
     }
-    this.commands.set(signature.name, {
+    const entry: CommandEntry = {
       name: signature.name,
       signature,
       description: instance.description ?? '',
       factory: () => new Ctor() as Command,
-    });
+    };
+    const group = splitCommandName(signature.name).group;
+    if (group !== undefined) {
+      entry.group = group;
+      const declared = groupDescriptionOf(instance);
+      if (declared !== undefined) entry.groupDescription = declared;
+    }
+    this.commands.set(signature.name, entry);
     return this;
   }
 
@@ -75,6 +109,40 @@ export class ConsoleKernel {
 
   get(name: string): CommandEntry | undefined {
     return this.commands.get(name);
+  }
+
+  /**
+   * Names of every registered group, sorted. Groups come from `group:name`
+   * command signatures — registering `db:migrate` creates the `db` group.
+   */
+  groups(): CommandGroup[] {
+    const byName = new Map<string, CommandEntry[]>();
+    for (const entry of this.list()) {
+      if (entry.group === undefined) continue;
+      const bucket = byName.get(entry.group);
+      if (bucket === undefined) byName.set(entry.group, [entry]);
+      else bucket.push(entry);
+    }
+    return [...byName.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, commands]) => ({
+        name,
+        description: commands.find((c) => c.groupDescription !== undefined)?.groupDescription ?? '',
+        commands,
+      }));
+  }
+
+  /** Commands with no group. */
+  ungrouped(): CommandEntry[] {
+    return this.list().filter((entry) => entry.group === undefined);
+  }
+
+  /** True when a group with this name exists (implying commands under it). */
+  hasGroup(name: string): boolean {
+    for (const entry of this.commands.values()) {
+      if (entry.group === name) return true;
+    }
+    return false;
   }
 
   /** Dispatch argv (command name + arguments). Returns the exit code. */

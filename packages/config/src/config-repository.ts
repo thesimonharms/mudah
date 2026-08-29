@@ -1,4 +1,5 @@
 import { assignPath, deepMerge, hasPath, isPlainObject, readPath, removePath } from './paths.js';
+import { validateSchema, type Schema, type SchemaResult } from './schema.js';
 
 /**
  * Dotted-key configuration repository.
@@ -51,5 +52,17 @@ export class ConfigRepository {
   clear(): this {
     this.root = {};
     return this;
+  }
+
+  /**
+   * Check a subtree against `schema`. Reports every problem at once, with
+   * paths relative to `key` (`db.pool` for `validate('db', …)`).
+   *
+   * Use at boot: a config typo then fails loudly instead of surfacing as a
+   * confusing `undefined` three layers down.
+   */
+  validate<T>(key: string, schema: Schema<T>): SchemaResult<T> {
+    const value = key === '' ? this.root : this.get(key, undefined);
+    return validateSchema(schema, value, key);
   }
 }

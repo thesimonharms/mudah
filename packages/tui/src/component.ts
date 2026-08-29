@@ -1,4 +1,4 @@
-import type { KeyEvent } from '@mudah-cli/terminal';
+import type { KeyEvent, MouseEvent } from '@mudah-cli/terminal';
 
 /**
  * The TUI component contract. Implement this to add any widget — Mudah's
@@ -17,6 +17,19 @@ export interface Component {
   onBlur?(): void;
   /** Handle a key while focused. Return true to consume it. */
   onKey?(event: KeyEvent): boolean;
+  /**
+   * Handle a mouse event whose coordinates fall inside the component's box.
+   * Return true to consume it. Coordinates are relative to the component's
+   * own top-left corner.
+   */
+  onMouse?(event: MouseEvent): boolean;
+  /**
+   * Report the size this component wants, given the width available. Used by
+   * layout containers; components that size themselves may ignore `width`.
+   */
+  measure?(width: number): { width: number; height: number };
+  /** Apply a size decided by a parent container. */
+  resize?(width: number, height: number): void;
 }
 
 /** Base implementation with sensible defaults. */
@@ -32,6 +45,10 @@ export abstract class BaseComponent implements Component {
   onBlur(): void {}
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onKey(_event: KeyEvent): boolean {
+    return false;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onMouse(_event: MouseEvent): boolean {
     return false;
   }
 }

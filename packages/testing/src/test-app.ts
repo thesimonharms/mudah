@@ -52,13 +52,25 @@ export class TestApp {
     const kernel = new ConsoleKernel(app, output);
     const testApp = new TestApp(app, output, kernel);
 
+    // Plugins first, matching `run()`: their providers must register
+    // before boot, and their commands join the same list as the app's.
+    const plugins = await app.discoverPlugins();
     await app.discoverProviders();
     await app.boot();
     await app.evaluateLazy();
 
-    const modules = [...(await app.discoverCommandModules()), ...(options.commands ?? [])];
+    const modules = [
+      ...(await app.discoverCommandModules()),
+      ...(options.commands ?? []),
+      ...plugins.flatMap((plugin) => [...plugin.commands]),
+    ];
     for (const mod of modules) {
-      kernel.register(mod);
+      try {
+        kernel.register(mod);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Duplicate command name')) continue;
+        throw error;
+      }
     }
     testApp.booted = true;
     return testApp;

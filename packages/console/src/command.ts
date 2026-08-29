@@ -27,6 +27,13 @@ export abstract class Command {
   /** One-line description for help output. */
   description = '';
 
+  /**
+   * Blurb for the group this command belongs to. Only meaningful on grouped
+   * signatures (`db:migrate`); the first command to set it labels the group
+   * in the command list.
+   */
+  groupDescription = '';
+
   /** The application (container, config, events). */
   app!: Application;
   /** Styled output for the user. */

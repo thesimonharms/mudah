@@ -10,12 +10,37 @@ export {
   UsageError,
   ExitError,
   CommandCancelled,
+  checkForUpdate,
+  clearUpdateCache,
+  compareSemVer,
+  discoverPlugins,
+  findPluginPackages,
+  formatUpdateNudge,
   loadManifest,
+  loadPlugin,
+  parseSemVer,
   type MudahManifest,
   type LazyProviderOptions,
+  type PluginDiscoveryOptions,
+  type PluginInfo,
   type ProviderClass,
   type AppEvents,
+  type UpdateCheckOptions,
+  type UpdateCheckResult,
 } from '@mudah-cli/core';
-export { ConfigRepository, defineConfig, env, loadEnvFile, loadConfigFiles } from '@mudah-cli/config';
+export {
+  ConfigRepository,
+  ConfigValidationError,
+  assertSchema,
+  defineConfig,
+  env,
+  loadEnvFile,
+  loadConfigFiles,
+  s,
+  validateSchema,
+  type Schema,
+  type SchemaIssue,
+  type SchemaResult,
+} from '@mudah-cli/config';
 export { Container } from '@mudah-cli/container';
 export { detectCapabilities, type TerminalCapabilities } from '@mudah-cli/terminal';

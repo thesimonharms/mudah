@@ -1,0 +1,18 @@
+{
+  "name": "@thesimonharms/deploy-audit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Audit plugin for the deploy-console example. A Mudah plugin: it declares the mudah-plugin keyword so the host app loads it from node_modules.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "mudah-plugin",
+    "cli"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@mudah-cli/mudah": "^0.2.0"
+  }
+}
