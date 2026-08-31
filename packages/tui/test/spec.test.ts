@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { s } from '@mudah-cli/config';
 import { parseKeys } from '@mudah-cli/terminal';
 import {
+  Calendar,
   Column,
   Form,
   FuzzyList,
@@ -191,5 +192,52 @@ describe('List mouse', () => {
     const tui = TestTui.mount(new Column().add(list));
     tui.click(0, 1);
     expect(list.selectedIndex).toBe(1);
+  });
+});
+
+describe('Calendar', () => {
+  const day = (date: Date): number => date.getUTCDate();
+  const yearMonth = (date: Date): number[] => [date.getUTCFullYear(), date.getUTCMonth()];
+
+  it('renders a month name and weekday header', () => {
+    const cal = new Calendar({ date: new Date(Date.UTC(2024, 0, 15)) });
+    const out = cal.render().join('\n');
+    expect(out).toContain('January');
+    expect(out).toContain('Su');
+  });
+
+  it('marks the cursor day with a glyph', () => {
+    const cal = new Calendar({ date: new Date(Date.UTC(2024, 0, 15)) });
+    expect(cal.render().join('\n')).toContain('▸15');
+  });
+
+  it('moves the cursor with arrows and wraps months', () => {
+    const cal = new Calendar({ date: new Date(Date.UTC(2024, 0, 15)) });
+    cal.onKey({ name: 'left' });
+    expect(day(cal.cursor)).toBe(14);
+    cal.onKey({ name: 'right' });
+    expect(day(cal.cursor)).toBe(15);
+    cal.onKey({ name: 'up' });
+    expect(day(cal.cursor)).toBe(8);
+    cal.onKey({ name: 'down' });
+    expect(day(cal.cursor)).toBe(15);
+    cal.onKey({ name: 'page-up' });
+    expect(yearMonth(cal.cursor)).toEqual([2023, 11]);
+    cal.onKey({ name: 'page-down' });
+    expect(yearMonth(cal.cursor)).toEqual([2024, 0]);
+  });
+
+  it('selects the cursor day on enter', () => {
+    let picked: Date | undefined;
+    const cal = new Calendar({
+      date: new Date(Date.UTC(2024, 0, 15)),
+      onSelect: (date) => {
+        picked = date;
+      },
+    });
+    cal.onKey({ name: 'enter' });
+    expect(day(cal.selected)).toBe(15);
+    expect(picked && day(picked)).toBe(15);
+    expect(picked && yearMonth(picked)).toEqual([2024, 0]);
   });
 });

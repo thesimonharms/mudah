@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderBarChart } from '@mudah-cli/ui';
+import { renderBarChart, renderLineChart } from '@mudah-cli/ui';
 
 describe('renderBarChart', () => {
   const entries = [
@@ -40,6 +40,43 @@ describe('renderBarChart', () => {
 
   it('paints bars with the theme accent at color level 24', () => {
     const out = renderBarChart(entries, { level: 24, width: 2 });
+    expect(out).toContain('\x1b[38;2;122;162;247m');
+  });
+});
+
+describe('renderLineChart', () => {
+  const peaks = [
+    { label: 'low', value: 0 },
+    { label: 'peak', value: 4 },
+    { label: 'low', value: 0 },
+  ];
+
+  it('plots the maximum value at the top row', () => {
+    const out = renderLineChart(peaks, { level: 0, width: 3, height: 4 });
+    const rows = out.split('\n');
+    expect(rows[0]).toContain('max: 4');
+    expect(rows[0]).not.toContain('●'); // the axis line carries no point
+    expect(out).toContain('●');
+  });
+
+  it('connects differing heights with a vertical bar', () => {
+    const out = renderLineChart(peaks, { level: 0, width: 3, height: 4, labels: false });
+    expect(out).toContain('│');
+  });
+
+  it('renders ascii glyphs without unicode', () => {
+    const out = renderLineChart(peaks, { level: 0, width: 3, height: 4, unicode: false });
+    expect(out).toContain('*');
+    expect(out).not.toContain('●');
+    expect(out).toContain('|');
+  });
+
+  it('returns no data for empty input', () => {
+    expect(renderLineChart([], { level: 0 })).toContain('no data');
+  });
+
+  it('paints points with the accent at color level 24', () => {
+    const out = renderLineChart(peaks, { level: 24, width: 3, height: 4 });
     expect(out).toContain('\x1b[38;2;122;162;247m');
   });
 });
