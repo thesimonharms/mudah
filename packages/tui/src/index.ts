@@ -10,6 +10,7 @@ export {
   MultiList,
   Panel,
   Table,
+  Tabs,
   TextInput,
   Viewport,
   type TableColumnDef,
