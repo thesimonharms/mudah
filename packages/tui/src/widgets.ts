@@ -803,6 +803,84 @@ export class BarChart extends BaseComponent {
 }
 
 /**
+ * An inline spinner that advances one frame per render. Pairs with a Program
+ * that calls `tick(deltaMs)` on every paint. The frames are inlined so this
+ * package stays independent of `@mudah-cli/animation`.
+ */
+const DEFAULT_SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const DEFAULT_SPINNER_INTERVAL = 80;
+
+export class Spinner extends BaseComponent {
+  private elapsed = 0;
+  private frame = 0;
+  readonly focusable = false;
+  private label = '';
+
+  constructor(
+    private readonly frames: readonly string[] = DEFAULT_SPINNER_FRAMES,
+    private readonly interval = DEFAULT_SPINNER_INTERVAL,
+  ) {
+    super();
+  }
+
+  setLabel(label: string): void {
+    this.label = label;
+  }
+
+  /** Advance the animation; call from the render loop. */
+  tick(deltaMs: number): void {
+    this.elapsed += deltaMs;
+    while (this.elapsed >= this.interval) {
+      this.frame = (this.frame + 1) % this.frames.length;
+      this.elapsed -= this.interval;
+    }
+  }
+
+  render(): string[] {
+    const glyph = this.frames[this.frame] ?? '·';
+    return this.label ? [`${glyph} ${this.label}`] : [glyph];
+  }
+
+  measure(_width: number, _height: number): { width: number; height: number } {
+    return { width: this.label.length + 2, height: 1 };
+  }
+
+  inspect(): { role: string; name?: string; value?: unknown } {
+    return { role: 'spinner', name: this.label, value: this.frame };
+  }
+}
+
+/**
+ * Anchored hint text. Not focusable: rendered as a 1-line box, or as plain
+ * text when no title is set. Useful for "what is this?" hover-style hints in
+ * a TUI.
+ */
+export class Tooltip extends BaseComponent {
+  readonly focusable = false;
+
+  constructor(private title: string, private text: string) {
+    super();
+  }
+
+  setText(text: string): void {
+    this.text = text;
+  }
+
+  render(): string[] {
+    if (this.text.length === 0) return [this.title];
+    return [this.title ? `${this.title} — ${this.text}` : this.text];
+  }
+
+  measure(_width: number, _height: number): { width: number; height: number } {
+    return { width: Math.max(this.title.length, this.text.length), height: 1 };
+  }
+
+  inspect(): { role: string; name?: string; value?: unknown } {
+    return { role: 'tooltip', name: this.title, value: this.text };
+  }
+}
+
+/**
  * A set of tab panels. Left/right (and home/end) move focus; enter confirms.
  * The active tab's content is rendered beneath a one-line header of all tabs.
  */
