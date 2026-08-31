@@ -50,6 +50,7 @@ describe('scaffold', () => {
       'src/providers/AppProvider.ts',
       'config/app.ts',
       'test/welcome.test.ts',
+      'AGENTS.md',
     ]) {
       expect(existsSync(join(dir, file)), `missing ${file}`).toBe(true);
     }

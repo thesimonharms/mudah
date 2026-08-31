@@ -128,6 +128,7 @@ describe('run()', () => {
     expect(out).toContain('Runtime');
     expect(out).toContain('Application');
     expect(out).toContain('Terminal');
+    expect(out).toContain('TUI');
   });
 
   it('scaffolds new commands with make', async () => {
@@ -139,6 +140,17 @@ describe('run()', () => {
     const content = await readFile(file, 'utf8');
     expect(content).toContain('class Ping');
     expect(content).toContain("signature = 'ping {target?}'");
+  });
+
+  it('scaffolds a TUI picker with make tui', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['make', 'tui', 'picker'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+    const file = join(appDir, 'src', 'commands', 'picker.command.ts');
+    expect(existsSync(file)).toBe(true);
+    const content = await readFile(file, 'utf8');
+    expect(content).toContain('Screen.picker');
+    expect(content).toContain('screen.attach(program)');
   });
 
   it('rejects invalid make input with a usage error', async () => {

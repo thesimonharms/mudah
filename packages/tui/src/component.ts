@@ -24,12 +24,24 @@ export interface Component {
    */
   onMouse?(event: MouseEvent): boolean;
   /**
-   * Report the size this component wants, given the width available. Used by
-   * layout containers; components that size themselves may ignore `width`.
+   * Report the size this component wants, given the box available. Used by
+   * Row / Column / Split. Return a minimum or preferred size, not a size that
+   * a previous `resize()` assigned — otherwise stretch children grow every frame.
    */
-  measure?(width: number): { width: number; height: number };
-  /** Apply a size decided by a parent container. */
+  measure?(width: number, height: number): { width: number; height: number };
+  /**
+   * Assigned box from a parent layout. Presence of `resize` marks a stretch
+   * child: leftover Column/Row space goes here.
+   */
   resize?(width: number, height: number): void;
+  inspect?(): { role: string; name?: string; value?: unknown; href?: string };
+  /**
+   * Write protocol sequences that cannot live in the cell grid (Kitty
+   * graphics). `x`/`y` are the component's top-left on screen.
+   */
+  paintExtras?(stream: { write(data: string): unknown }, x: number, y: number): void;
+  /** Keymap labels for help footers. */
+  keys?: Record<string, string>;
 }
 
 /** Base implementation with sensible defaults. */

@@ -27,6 +27,8 @@ export interface KeyEvent {
   name: KeyName;
   /** Raw character for printable keys. */
   ch?: string;
+  /** Bracketed-paste payload when `name` is `paste`. */
+  paste?: string;
   /**
    * How the key moved. Legacy terminals only ever send `press` (and treat
    * auto-repeat as another press). Kitty's keyboard protocol can also send
@@ -69,6 +71,19 @@ export function disableKittyKeyboard(): string {
   return '\x1b[<u';
 }
 
+/** Enable bracketed paste (`ESC[?2004h`). */
+export function enableBracketedPaste(): string {
+  return '\x1b[?2004h';
+}
+
+/** Disable bracketed paste. */
+export function disableBracketedPaste(): string {
+  return '\x1b[?2004l';
+}
+
+const PASTE_START = '\x1b[200~';
+const PASTE_END = '\x1b[201~';
+
 /**
  * Parse a raw input buffer into key events. Pure and synchronous.
  * Handles CSI sequences (arrows, home/end, paging, delete, CSI u), Kitty
@@ -85,6 +100,15 @@ export function parseKeys(buffer: string): KeyEvent[] {
 
     if (char === '\x1b') {
       const rest = buffer.slice(i + 1);
+
+      if (rest.startsWith('[200~')) {
+        const end = buffer.indexOf(PASTE_END, i);
+        if (end < 0) break;
+        const payload = buffer.slice(i + PASTE_START.length, end);
+        events.push({ name: 'paste', paste: payload, kind: 'press' });
+        i = end + PASTE_END.length;
+        continue;
+      }
 
       // APC (Kitty graphics): ESC _ ... ST (ESC \). Skip, never a key.
       if (rest.startsWith('_')) {
@@ -303,6 +327,12 @@ export class KeyParser {
 
     if (rest.startsWith('_')) {
       return rest.includes('\x1b\\') ? text.length : -1;
+    }
+
+    if (text.includes('\x1b[200~')) {
+      const lastStart = text.lastIndexOf('\x1b[200~');
+      const lastEnd = text.lastIndexOf('\x1b[201~');
+      if (lastEnd < lastStart) return -1;
     }
 
     if (rest.startsWith('[<')) {

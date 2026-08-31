@@ -17,7 +17,7 @@
     "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.typecheck.json",
     "test": "vitest run",
     "bench": "node tools/bench/run.mjs",
-    "release:prepare": "node scripts/release.mjs"
+    "release": "node scripts/publish.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

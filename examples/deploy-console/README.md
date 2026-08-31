@@ -21,7 +21,7 @@ npm test
 | --- | --- |
 | Config schema validation | `config/deploy.ts` |
 | Grouped commands (`deploy:`, `db:`) | `src/commands/` |
-| TUI table, panel, viewport, mouse | `dashboard` |
+| TUI table, panel, viewport, split, mouse | `dashboard` |
 | OSC 10/11 theme query | `theme` |
 | `--profile` timings | `db:status --profile` |
 | Update nudge | `bin/deploy.js` (`updatePackage`) |

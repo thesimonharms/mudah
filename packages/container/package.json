@@ -1,6 +1,6 @@
 {
   "name": "@mudah-cli/container",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "description": "High-performance IoC service container with constructor auto-injection.",
   "type": "module",
   "license": "MIT",

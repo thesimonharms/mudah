@@ -13,6 +13,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@mudah-cli/mudah": "^0.2.0"
+    "@mudah-cli/mudah": "^0.8.0"
   }
 }

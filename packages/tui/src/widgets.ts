@@ -1,6 +1,6 @@
 import { BaseComponent, type Component } from './component.js';
 import type { KeyEvent, MouseEvent } from '@mudah-cli/terminal';
-import { renderPanel, renderTable } from '@mudah-cli/ui';
+import { renderPanel, renderTable, visibleLength } from '@mudah-cli/ui';
 
 /** Column definition for the {@link Table} widget. */
 export interface TableColumnDef {
@@ -54,11 +54,23 @@ export class Table extends BaseComponent {
    * the rule under the header, and the bottom border.
    */
   private static readonly CHROME_ROWS = 4;
+  /** Height assigned by a parent layout. Distinct from user `viewportHeight`. */
+  private allocatedHeight?: number;
 
-  /** How many data rows fit in `viewportHeight`. */
+  /** How many data rows fit in the current height cap. */
   private get budget(): number {
-    if (this.viewportHeight === undefined || this.viewportHeight <= 0) return this.rows.length;
-    return Math.max(1, this.viewportHeight - Table.CHROME_ROWS);
+    const cap = this.allocatedHeight ?? this.viewportHeight;
+    if (cap === undefined || cap <= 0) return this.rows.length;
+    return Math.max(1, cap - Table.CHROME_ROWS);
+  }
+
+  measure(width: number, _height: number): { width: number; height: number } {
+    const content = Table.CHROME_ROWS + Math.max(this.rows.length, 1);
+    return { width: Math.min(width, 1), height: this.viewportHeight ?? content };
+  }
+
+  resize(_width: number, height: number): void {
+    this.allocatedHeight = height;
   }
 
   /** First row drawn, keeping the selection in view. */
@@ -127,6 +139,8 @@ export class Table extends BaseComponent {
 
 /** A titled bordered box. Not focusable. */
 export class Panel extends BaseComponent {
+  private allocated?: { width: number; height: number };
+
   constructor(
     private title: string | undefined,
     private body: string[],
@@ -139,11 +153,32 @@ export class Panel extends BaseComponent {
     this.body = body;
   }
 
+  measure(width: number, _height: number): { width: number; height: number } {
+    const lines = this.draw(this.width);
+    const w = visibleLength(lines[0] ?? '');
+    return { width: Math.min(width, w), height: lines.length };
+  }
+
+  resize(width: number, height: number): void {
+    this.allocated = { width, height };
+  }
+
   render(): string[] {
+    const inner =
+      this.allocated !== undefined ? Math.max(0, this.allocated.width - 4) : this.width;
+    const lines = this.draw(inner);
+    const target = this.allocated?.height;
+    if (target === undefined) return lines;
+    if (lines.length > target) return lines.slice(0, target);
+    while (lines.length < target) lines.push('');
+    return lines;
+  }
+
+  private draw(innerWidth: number | undefined): string[] {
     const rendered = renderPanel(this.title, this.body, {
       level: 0,
       unicode: true,
-      ...(this.width === undefined ? {} : { width: this.width }),
+      ...(innerWidth === undefined ? {} : { width: innerWidth }),
     });
     return rendered.split('\n');
   }
@@ -160,12 +195,25 @@ export class Panel extends BaseComponent {
 export class Viewport extends BaseComponent {
   /** First visible row of the child's output. */
   scrollTop = 0;
+  /** Preferred height. `resize()` changes the displayed height only. */
+  private preferredHeight: number;
+  private viewportHeight: number;
 
   constructor(
     private child: Component,
-    private viewportHeight: number,
+    viewportHeight: number,
   ) {
     super();
+    this.preferredHeight = viewportHeight;
+    this.viewportHeight = viewportHeight;
+  }
+
+  measure(width: number, _height: number): { width: number; height: number } {
+    return { width: Math.min(width, 1), height: Math.max(1, this.preferredHeight) };
+  }
+
+  resize(_width: number, height: number): void {
+    this.viewportHeight = Math.max(0, height);
   }
 
   /** Rows of content available below the current scroll position. */
@@ -179,7 +227,8 @@ export class Viewport extends BaseComponent {
 
   /** Change the number of visible rows (e.g. after a terminal resize). */
   setHeight(rows: number): void {
-    this.viewportHeight = Math.max(0, rows);
+    this.preferredHeight = Math.max(0, rows);
+    this.viewportHeight = this.preferredHeight;
     this.scrollTo(this.scrollTop);
   }
 
@@ -265,6 +314,12 @@ export class Label extends BaseComponent {
     return this.text.split('\n');
   }
 
+  measure(width: number, _height: number): { width: number; height: number } {
+    const lines = this.text.split('\n');
+    const content = Math.max(0, ...lines.map((line) => visibleLength(line)));
+    return { width: Math.min(width, content), height: lines.length };
+  }
+
   readonly focusable = false;
 }
 
@@ -301,6 +356,17 @@ export class List extends BaseComponent {
     return this.items.map((item, i) => (i === this.selectedIndex ? `▸ ${item}` : `  ${item}`));
   }
 
+  inspect(): { role: string; name?: string; value?: unknown } {
+    return { role: 'list', name: this.selected, value: this.selectedIndex };
+  }
+
+  readonly keys = { up: 'up', down: 'down', enter: 'select' };
+
+  measure(width: number, _height: number): { width: number; height: number } {
+    const content = Math.max(0, ...this.items.map((item) => visibleLength(`▸ ${item}`)));
+    return { width: Math.min(width, Math.max(content, 1)), height: this.items.length };
+  }
+
   readonly focusable = true;
 
   override onKey(event: KeyEvent): boolean {
@@ -317,6 +383,22 @@ export class List extends BaseComponent {
       default:
         return false;
     }
+  }
+
+  override onMouse(event: MouseEvent): boolean {
+    if (event.wheel === 'up') {
+      this.move(-1);
+      return true;
+    }
+    if (event.wheel === 'down') {
+      this.move(1);
+      return true;
+    }
+    if (event.buttons.left && event.y >= 0 && event.y < this.items.length) {
+      this.selectedIndex = event.y;
+      return true;
+    }
+    return false;
   }
 }
 
@@ -366,6 +448,11 @@ export class MultiList extends BaseComponent {
     });
   }
 
+  measure(width: number, _height: number): { width: number; height: number } {
+    const content = Math.max(0, ...this.items.map((item) => visibleLength(`▸ [x] ${item}`)));
+    return { width: Math.min(width, Math.max(content, 1)), height: this.items.length };
+  }
+
   readonly focusable = true;
 
   override onKey(event: KeyEvent): boolean {
@@ -386,13 +473,32 @@ export class MultiList extends BaseComponent {
         return false;
     }
   }
+
+  override onMouse(event: MouseEvent): boolean {
+    if (event.wheel === 'up') {
+      this.move(-1);
+      return true;
+    }
+    if (event.wheel === 'down') {
+      this.move(1);
+      return true;
+    }
+    if (event.buttons.left && event.y >= 0 && event.y < this.items.length) {
+      this.selectedIndex = event.y;
+      return true;
+    }
+    return false;
+  }
 }
 
-/** Single-line text input with a visible caret. Focusable. */
+/** Single-line text input with a moving caret. Focusable. */
 export class TextInput extends BaseComponent {
   value = '';
+  /** Caret index in `value`. */
+  cursor = 0;
   /** Max visible width before horizontal scrolling. */
   width = 30;
+  onChange?: (value: string) => void;
 
   constructor(private onSubmit?: (value: string) => void) {
     super();
@@ -402,109 +508,79 @@ export class TextInput extends BaseComponent {
     this.onSubmit?.(this.value);
   }
 
+  private emitChange(): void {
+    this.onChange?.(this.value);
+  }
+
+  insert(text: string): void {
+    this.value = this.value.slice(0, this.cursor) + text + this.value.slice(this.cursor);
+    this.cursor += text.length;
+    this.emitChange();
+  }
+
   render(): string[] {
-    const start = Math.max(0, this.value.length - this.width + 1);
-    const visible = this.value.slice(start);
-    return [`> ${visible}▏`];
+    const caret = Math.min(Math.max(this.cursor, 0), this.value.length);
+    const start = Math.max(0, caret - this.width + 1);
+    const visible = this.value.slice(start, start + this.width);
+    const local = caret - start;
+    return [`> ${visible.slice(0, local)}▏${visible.slice(local)}`];
+  }
+
+  inspect(): { role: string; name?: string; value?: unknown } {
+    return { role: 'input', value: this.value };
+  }
+
+  readonly keys = { enter: 'submit', 'left/right': 'caret' };
+
+  measure(width: number, _height: number): { width: number; height: number } {
+    return { width: Math.min(width, this.width + 3), height: 1 };
   }
 
   readonly focusable = true;
 
   override onKey(event: KeyEvent): boolean {
+    if (event.name === 'paste' && event.paste !== undefined) {
+      const clean = event.paste.replace(/\r?\n/g, '');
+      this.insert(clean);
+      return true;
+    }
     if (event.name === 'enter') {
       this.submit();
       return true;
     }
+    if (event.name === 'left') {
+      this.cursor = Math.max(0, this.cursor - 1);
+      return true;
+    }
+    if (event.name === 'right') {
+      this.cursor = Math.min(this.value.length, this.cursor + 1);
+      return true;
+    }
+    if (event.name === 'home') {
+      this.cursor = 0;
+      return true;
+    }
+    if (event.name === 'end') {
+      this.cursor = this.value.length;
+      return true;
+    }
     if (event.name === 'backspace') {
-      this.value = this.value.slice(0, -1);
+      if (this.cursor === 0) return true;
+      this.value = this.value.slice(0, this.cursor - 1) + this.value.slice(this.cursor);
+      this.cursor -= 1;
+      this.emitChange();
+      return true;
+    }
+    if (event.name === 'delete') {
+      this.value = this.value.slice(0, this.cursor) + this.value.slice(this.cursor + 1);
+      this.emitChange();
       return true;
     }
     if (event.ch !== undefined && event.ch >= ' ') {
-      this.value += event.ch;
+      this.insert(event.ch);
       return true;
     }
     return false;
   }
 }
 
-/** Layout container that owns Tab/Shift+Tab focus cycling and key routing. */
-export class Container {
-  private children: Component[] = [];
-  private focusIndex = -1;
-
-  add(...components: Component[]): this {
-    this.children.push(...components);
-    if (this.focusIndex === -1) this.focusFirst();
-    return this;
-  }
-
-  get components(): readonly Component[] {
-    return this.children;
-  }
-
-  get focused(): Component | undefined {
-    return this.children[this.focusIndex];
-  }
-
-  private focusFirst(): void {
-    const index = this.children.findIndex((c) => c.focusable);
-    this.setFocus(index);
-  }
-
-  private setFocus(index: number): void {
-    const previous = this.children[this.focusIndex];
-    previous?.onBlur?.();
-    this.focusIndex = index;
-    if (index >= 0) {
-      const next = this.children[index];
-      next?.onFocus?.();
-    }
-  }
-
-  cycle(direction: 1 | -1): void {
-    const count = this.children.length;
-    if (count === 0) return;
-    for (let step = 1; step <= count; step++) {
-      const candidate = (this.focusIndex + direction * step + count * 2) % count;
-      if (this.children[candidate]?.focusable) {
-        this.setFocus(candidate);
-        return;
-      }
-    }
-  }
-
-  /** Route a key: focused widget first, then the container's own handling. */
-  handleKey(event: KeyEvent): void {
-    if (event.kind === 'release') return;
-    if (event.name === 'tab' || event.name === 'shift-tab') {
-      this.cycle(event.name === 'tab' ? 1 : -1);
-      return;
-    }
-    if (this.focused?.onKey?.(event)) return;
-  }
-
-  /**
-   * Route a mouse event to the child that occupies the clicked row.
-   * Coordinates are translated into the child's own space; returns true when
-   * any child consumed it.
-   */
-  handleMouse(event: MouseEvent): boolean {
-    let row = 0;
-    for (const child of this.children) {
-      const height = child.height ?? child.render().length;
-      if (event.y >= row && event.y < row + height) {
-        return child.onMouse?.({ ...event, y: event.y - row }) ?? false;
-      }
-      row += height;
-    }
-    return false;
-  }
-
-  render(): string[] {
-    const rows: string[] = [];
-    for (const child of this.children) {
-      rows.push(...child.render());
-    }
-    return rows;
-  }
-}

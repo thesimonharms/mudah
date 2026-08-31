@@ -1,0 +1,9 @@
+{
+  "name": "minimal",
+  "version": "0.1.0",
+  "bin": "minimal",
+  "description": "minimal fixture app for Mudah framework tests",
+  "ui": {
+    "theme": "auto"
+  }
+}

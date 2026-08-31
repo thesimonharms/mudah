@@ -17,8 +17,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mudah-cli/mudah": "^0.5.0",
-    "@mudah-cli/vgpu": "^0.5.0"
+    "@mudah-cli/mudah": "^0.8.0",
+    "@mudah-cli/vgpu": "^0.8.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

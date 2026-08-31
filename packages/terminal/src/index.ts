@@ -7,7 +7,7 @@ export {
   type TerminalBrand,
   type TerminalCapabilities,
 } from './capabilities.js';
-export { guardedOsc, osc, type OscWriter } from './osc.js';
+export { guardedOsc, osc, hyperlinkWrap, type OscWriter } from './osc.js';
 export {
   parseOscColor,
   parseThemeResponses,
@@ -21,7 +21,7 @@ export {
   type ThemeQueryOptions,
   type ThemeQueryResult,
 } from './theme-query.js';
-export { enterRawMode, KeyParser, parseKeys, enableKittyKeyboard, disableKittyKeyboard, KITTY_KEYBOARD, KITTY_KEYBOARD_KEYUP, type KeyEvent, type KeyKind, type KeyName } from './keys.js';
+export { enterRawMode, KeyParser, parseKeys, enableKittyKeyboard, disableKittyKeyboard, enableBracketedPaste, disableBracketedPaste, KITTY_KEYBOARD, KITTY_KEYBOARD_KEYUP, type KeyEvent, type KeyKind, type KeyName } from './keys.js';
 export {
   KittyGraphics,
   encodeHalfBlocks,

@@ -1,39 +1,77 @@
+import type { ColorLevel } from '@mudah-cli/terminal';
+import { paint, type Theme } from '@mudah-cli/ui';
 import type { ScreenBuffer } from './screen-buffer.js';
 
+interface Cell {
+  char: string;
+  style: string;
+}
+
+const BLANK: Cell = { char: ' ', style: '' };
+
 /**
- * Minimal-repaint renderer: keeps the previously painted frame and emits
- * position-addressed updates (`ESC[y;xH`) for changed rows only. An
- * unchanged frame produces zero output.
+ * Minimal-repaint renderer. Compares cells and emits `ESC[y;xH` for changed
+ * runs only. An unchanged frame produces zero output.
  */
 export class DiffRenderer {
-  private prevLines: string[] = [];
+  private prev: Cell[][] = [];
 
-  /**
-   * Paint the buffer to the stream, writing only what changed since the
-   * previous call. Returns the number of characters emitted (0 when the
-   * frame is identical to the last).
-   */
-  paint(stream: { write(data: string): unknown }, buffer: ScreenBuffer): number {
-    const lines = buffer.toLines();
+  paint(
+    stream: { write(data: string): unknown },
+    buffer: ScreenBuffer,
+    theme?: Theme,
+    colorLevel: ColorLevel = 0,
+  ): number {
     let out = '';
+    const next: Cell[][] = [];
 
-    for (let y = 0; y < lines.length; y++) {
-      const current = lines[y] ?? '';
-      const previous = y < this.prevLines.length ? this.prevLines[y] : undefined;
-      if (current === previous) continue;
-      // Clear to end of line (handles shrinkage) then write at column 1.
-      out += `\x1b[${y + 1};1H\x1b[2K${current}`;
+    for (let y = 0; y < buffer.height; y++) {
+      const row: Cell[] = [];
+      for (let x = 0; x < buffer.width; x++) row.push(buffer.getCell(x, y));
+      next.push(row);
+
+      let x = 0;
+      while (x < buffer.width) {
+        const prevCell = this.prev[y]?.[x];
+        if (sameCell(prevCell, row[x])) {
+          x += 1;
+          continue;
+        }
+        const start = x;
+        const runStyle = row[x]?.style ?? '';
+        let run = '';
+        while (x < buffer.width && !sameCell(this.prev[y]?.[x], row[x]) && (row[x]?.style ?? '') === runStyle) {
+          const ch = row[x]?.char ?? '';
+          if (ch !== '') run += ch;
+          x += 1;
+        }
+        if (run.length > 0) {
+          out += `\x1b[${y + 1};${start + 1}H${colorize(run, runStyle, theme, colorLevel)}`;
+        }
+      }
     }
 
-    if (out.length > 0) {
-      stream.write(out);
-    }
-    this.prevLines = lines;
+    if (out.length > 0) stream.write(out);
+    this.prev = next;
     return out.length;
   }
 
-  /** Forget the previous frame (next paint is full). */
   reset(): void {
-    this.prevLines = [];
+    this.prev = [];
   }
+}
+
+function sameCell(a: Cell | undefined, b: Cell | undefined): boolean {
+  const left = a ?? BLANK;
+  const right = b ?? BLANK;
+  const lc = left.char === '' ? ' ' : left.char;
+  const rc = right.char === '' ? ' ' : right.char;
+  return lc === rc && left.style === right.style;
+}
+
+function colorize(text: string, style: string, theme: Theme | undefined, level: ColorLevel): string {
+  if (!theme || style === '' || level === 0) return text;
+  const hex = theme.colors[style as keyof Theme['colors']];
+  if (!hex) return text;
+  return paint(hex, text, level);
 }

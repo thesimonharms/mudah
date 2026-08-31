@@ -58,13 +58,28 @@
     },
     "examples/melody": {
       "name": "melody",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "melody": "./bin/melody.js",
       },
       "dependencies": {
         "@mudah-cli/audio": "^0.4.0",
         "@mudah-cli/mudah": "^0.4.0",
+      },
+      "devDependencies": {
+        "@types/node": "^26.0.0",
+        "typescript": "^7.0.0",
+        "vitest": "^4.0.0",
+      },
+    },
+    "examples/ops-desk": {
+      "name": "ops-desk",
+      "version": "0.1.0",
+      "bin": {
+        "ops-desk": "./bin/ops-desk.js",
+      },
+      "dependencies": {
+        "@mudah-cli/mudah": "^0.5.0",
       },
       "devDependencies": {
         "@types/node": "^26.0.0",
@@ -90,7 +105,7 @@
     },
     "examples/tone": {
       "name": "tone",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "tone": "./bin/tone.js",
       },
@@ -106,14 +121,14 @@
     },
     "packages/animation": {
       "name": "@mudah-cli/animation",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/terminal": "^0.4.0",
+        "@mudah-cli/terminal": "^0.5.0",
       },
     },
     "packages/audio": {
       "name": "@mudah-cli/audio",
-      "version": "0.4.0",
+      "version": "0.5.1",
       "peerDependencies": {
         "audify": "^1.10.0",
       },
@@ -123,33 +138,33 @@
     },
     "packages/config": {
       "name": "@mudah-cli/config",
-      "version": "0.4.0",
+      "version": "0.5.0",
     },
     "packages/console": {
       "name": "@mudah-cli/console",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/animation": "^0.4.0",
-        "@mudah-cli/core": "^0.4.0",
-        "@mudah-cli/terminal": "^0.4.0",
-        "@mudah-cli/ui": "^0.4.0",
+        "@mudah-cli/animation": "^0.5.0",
+        "@mudah-cli/core": "^0.5.0",
+        "@mudah-cli/terminal": "^0.5.0",
+        "@mudah-cli/ui": "^0.5.0",
       },
     },
     "packages/container": {
       "name": "@mudah-cli/container",
-      "version": "0.4.0",
+      "version": "0.5.0",
     },
     "packages/core": {
       "name": "@mudah-cli/core",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/config": "^0.4.0",
-        "@mudah-cli/container": "^0.4.0",
+        "@mudah-cli/config": "^0.5.0",
+        "@mudah-cli/container": "^0.5.0",
       },
     },
     "packages/create-mudah": {
       "name": "@mudah-cli/create-mudah",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "create-mudah": "./dist/cli.js",
       },
@@ -161,53 +176,54 @@
     },
     "packages/mudah": {
       "name": "@mudah-cli/mudah",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/animation": "^0.4.0",
-        "@mudah-cli/config": "^0.4.0",
-        "@mudah-cli/console": "^0.4.0",
-        "@mudah-cli/container": "^0.4.0",
-        "@mudah-cli/core": "^0.4.0",
-        "@mudah-cli/terminal": "^0.4.0",
-        "@mudah-cli/testing": "^0.4.0",
-        "@mudah-cli/tui": "^0.4.0",
-        "@mudah-cli/ui": "^0.4.0",
+        "@mudah-cli/animation": "^0.5.0",
+        "@mudah-cli/config": "^0.5.0",
+        "@mudah-cli/console": "^0.5.0",
+        "@mudah-cli/container": "^0.5.0",
+        "@mudah-cli/core": "^0.5.0",
+        "@mudah-cli/terminal": "^0.5.0",
+        "@mudah-cli/testing": "^0.5.0",
+        "@mudah-cli/tui": "^0.5.0",
+        "@mudah-cli/ui": "^0.5.0",
       },
     },
     "packages/terminal": {
       "name": "@mudah-cli/terminal",
-      "version": "0.4.0",
+      "version": "0.5.0",
     },
     "packages/testing": {
       "name": "@mudah-cli/testing",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/animation": "^0.4.0",
-        "@mudah-cli/console": "^0.4.0",
-        "@mudah-cli/core": "^0.4.0",
-        "@mudah-cli/terminal": "^0.4.0",
-        "@mudah-cli/tui": "^0.4.0",
-        "@mudah-cli/ui": "^0.4.0",
+        "@mudah-cli/animation": "^0.5.0",
+        "@mudah-cli/console": "^0.5.0",
+        "@mudah-cli/core": "^0.5.0",
+        "@mudah-cli/terminal": "^0.5.0",
+        "@mudah-cli/tui": "^0.5.0",
+        "@mudah-cli/ui": "^0.5.0",
       },
     },
     "packages/tui": {
       "name": "@mudah-cli/tui",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/terminal": "^0.4.0",
-        "@mudah-cli/ui": "^0.4.0",
+        "@mudah-cli/config": "^0.5.0",
+        "@mudah-cli/terminal": "^0.5.0",
+        "@mudah-cli/ui": "^0.5.0",
       },
     },
     "packages/ui": {
       "name": "@mudah-cli/ui",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
-        "@mudah-cli/terminal": "^0.4.0",
+        "@mudah-cli/terminal": "^0.5.0",
       },
     },
     "packages/vgpu": {
       "name": "@mudah-cli/vgpu",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "dependencies": {
         "@mudah-cli/terminal": "^0.3.0",
         "vgpu": "^0.3.1",
@@ -472,6 +488,8 @@
     "nanoid": ["nanoid@3.3.18", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w=="],
 
     "obug": ["obug@2.1.4", "", {}, "sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA=="],
+
+    "ops-desk": ["ops-desk@workspace:examples/ops-desk"],
 
     "pathe": ["pathe@2.0.3", "", {}, "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="],
 

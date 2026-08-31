@@ -187,6 +187,14 @@ describe('Kitty keyboard protocol', () => {
     expect(parser.feed('\x1b[97;1:')).toEqual([]);
     expect(parser.feed('3u').map((k) => k.kind)).toEqual(['release']);
   });
+
+  it('waits for a bracketed paste to end', () => {
+    const parser = new KeyParser();
+    expect(parser.feed('\x1b[200~hel')).toEqual([]);
+    const [event] = parser.feed('lo\x1b[201~');
+    expect(event?.name).toBe('paste');
+    expect(event?.paste).toBe('hello');
+  });
 });
 
 describe('osc', () => {

@@ -5,6 +5,12 @@ function oscSequence(code: number, payload: string): string {
   return `\x1b]${code};${payload}${BEL}`;
 }
 
+/** Wrap `text` in an OSC 8 hyperlink. Width of the result is `text` only. */
+export function hyperlinkWrap(uri: string, text: string): string {
+  if (uri === '') return text;
+  return `\x1b]8;;${uri}\x1b\\${text}\x1b]8;;\x1b\\`;
+}
+
 export interface OscWriter {
   write(data: string): unknown;
 }
@@ -32,8 +38,7 @@ export const osc = {
 
   /** OSC 8 hyperlink: `text` renders as a clickable link to `uri`. */
   hyperlink(stream: OscWriter, uri: string, text: string): void {
-    const params = uri === '' ? '' : `8;;${uri}`;
-    stream.write(`\x1b]${params}\x1b\\${text}\x1b]8;;\x1b\\`);
+    stream.write(hyperlinkWrap(uri, text));
   },
 
   /** Mark the start of a prompt line (OSC 133 A). */

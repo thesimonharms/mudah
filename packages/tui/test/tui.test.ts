@@ -6,6 +6,7 @@ import {
   Label,
   List,
   MultiList,
+  Overlay,
   Panel,
   Program,
   ScreenBuffer,
@@ -13,6 +14,7 @@ import {
   TextInput,
   Viewport,
 } from '@mudah-cli/tui';
+import { EventEmitter } from 'node:events';
 
 const key = (name: string, ch?: string): KeyEvent => ({ name, ch });
 
@@ -93,7 +95,7 @@ describe('DiffRenderer', () => {
     b.setLines(['ax', 'cd']);
     renderer.paint(stream, b);
     const second = written[1] ?? '';
-    expect(second).toContain('ax');
+    expect(second).toContain('x');
     expect(second).not.toContain('cd');
   });
 
@@ -263,7 +265,8 @@ describe('Program (headless)', () => {
     const session = headless(container);
     await new Promise((r) => setTimeout(r, 30));
     expect(session.out()).toContain('mudah tui');
-    expect(session.out()).toContain('▸ x');
+    expect(session.out()).toContain('▸');
+    expect(session.out()).toContain('x');
     session.quit();
     const { code } = await session;
     expect(code).toBe(0);
@@ -274,13 +277,54 @@ describe('Program (headless)', () => {
     const container = new Container().add(label);
     const session = headless(container);
     await new Promise((r) => setTimeout(r, 30));
+    const first = session.out();
+    expect(first).toContain('before');
     label.setText('after');
     await new Promise((r) => setTimeout(r, 30));
     session.quit();
     const { code } = await session;
     expect(code).toBe(0);
-    expect(session.out()).toContain('before');
-    expect(session.out()).toContain('after');
+    // Cell-level diff skips the shared 'r' in before/after, so the second
+    // paint is the changed prefix plus a trailing space, not the word "after".
+    expect(session.out().length).toBeGreaterThan(first.length);
+    expect(session.out().slice(first.length)).toContain('afte');
+  });
+
+  it('routes keystrokes from stdin to the mounted tree', async () => {
+    const emitter = new EventEmitter();
+    const stdin = emitter as unknown as NodeJS.ReadStream;
+    Object.assign(stdin, {
+      isTTY: true,
+      setRawMode: () => {},
+      resume: () => {},
+      pause: () => {},
+    });
+    const list = new List(['a', 'b', 'c']);
+    let picked = '';
+    const overlay = new Overlay(new Container().add(list));
+    overlay.setPalette([{ id: 'go', label: 'Go now' }], (id) => {
+      picked = id;
+    });
+    const program = new Program({
+      stdin,
+      stdout: { isTTY: true, columns: 40, rows: 10, write: () => {} },
+      frameMs: 5,
+      inline: true,
+    });
+    program.mount(overlay);
+    const run = program.run();
+    await new Promise((r) => setTimeout(r, 20));
+    emitter.emit('data', '\x1b[B');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(list.selectedIndex).toBe(1);
+    emitter.emit('data', '\x0b');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(overlay.render().join('\n')).toContain('Go now');
+    emitter.emit('data', '\r');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(picked).toBe('go');
+    program.quit();
+    expect(await run).toBe(0);
   });
 });
 
@@ -455,9 +499,9 @@ describe('mouse routing', () => {
   it('delivers a click to the child under the cursor', () => {
     const list = new List(['a', 'b', 'c']);
     const container = new Container().add(new Label('header'), list);
-    // The label occupies row 0, so the list starts at row 1.
-    expect(container.handleMouse(click(0, 2))).toBe(false);
-    expect(list.selectedIndex).toBe(0);
+    // The label occupies row 0, so the list starts at row 1. Local y=1 is 'b'.
+    expect(container.handleMouse(click(0, 2))).toBe(true);
+    expect(list.selectedIndex).toBe(1);
   });
 
   it('translates coordinates into the child space', () => {

@@ -6,17 +6,30 @@ import {
   enableMouse,
   enableKittyKeyboard,
   disableKittyKeyboard,
+  enableBracketedPaste,
+  disableBracketedPaste,
+  detectCapabilities,
   type KeyEvent,
   type MouseModeOptions,
+  type ColorLevel,
 } from '@mudah-cli/terminal';
+import { sleekDark, type Theme } from '@mudah-cli/ui';
 import { ScreenBuffer } from './screen-buffer.js';
 import { DiffRenderer } from './diff-renderer.js';
-import type { Component } from './component.js';
-import type { Container } from './widgets.js';
+import { blitLines } from './blit.js';
+import { dumpTree, type TreeNode } from './dump.js';
+import type { Layout } from './layout.js';
 
 export interface ProgramOptions {
   /** Output stream. Defaults to `process.stdout`. */
-  stdout?: { write(data: string): unknown; isTTY?: boolean };
+  stdout?: {
+    write(data: string): unknown;
+    isTTY?: boolean;
+    columns?: number;
+    rows?: number;
+    on?: (event: string, fn: () => void) => void;
+    off?: (event: string, fn: () => void) => void;
+  };
   /** Input stream for key events. Defaults to `process.stdin`. */
   stdin?: NodeJS.ReadStream;
   /** Paint interval in ms. Default 16 (~60fps). */
@@ -35,6 +48,10 @@ export interface ProgramOptions {
    * ignore the enable sequence.
    */
   keyboard?: boolean;
+  /** Theme used when painting styled cells. Default sleek-dark. */
+  theme?: Theme;
+  /** Color level. Default from capability detection. */
+  colorLevel?: ColorLevel;
   /** Called for every key event, including repeats and releases. */
   onKey?: (event: KeyEvent) => void;
 }
@@ -43,27 +60,31 @@ export interface ProgramOptions {
  * A full-screen terminal program: owns the alt-buffer lifecycle, the raw-mode
  * key pump, and scheduled repaints.
  *
- * ```ts
- * const program = new Program();
- * const list = new List(items, () => program.quit());
- * program.mount(new Container().add(list));
- * const code = await program.run(); // resolves on quit()
- * ```
+ * `Container` is a Column. `Row`, `Split`, `Stack`, and `Overlay` are also
+ * valid roots.
  *
- * Every keystroke is routed to the focused component through
- * `container.handleKey`, then a repaint is requested — the interval paints
- * only when dirty. `esc` quits with 0, `ctrl+c` with 130.
+ * `esc` quits with 0 unless the root consumes it (an open Overlay).
+ * `ctrl+c` quits with 130.
  */
 export class Program {
-  private readonly stdout: { write(data: string): unknown; isTTY?: boolean };
+  private readonly stdout: {
+    write(data: string): unknown;
+    isTTY?: boolean;
+    columns?: number;
+    rows?: number;
+    on?: (event: string, fn: () => void) => void;
+    off?: (event: string, fn: () => void) => void;
+  };
   private readonly stdin?: NodeJS.ReadStream;
   private readonly frameMs: number;
   private readonly inline: boolean;
   private readonly mouse: MouseModeOptions | false;
   private readonly keyboard: boolean;
+  private readonly theme: Theme;
+  private readonly colorLevel: ColorLevel;
   private readonly onKeyHook: ((event: KeyEvent) => void) | undefined;
 
-  private container: Container | undefined;
+  private container: Layout | undefined;
   private readonly renderer = new DiffRenderer();
   private running = false;
   private dirty = true;
@@ -72,19 +93,27 @@ export class Program {
   private exitRaw: (() => void) | null = null;
   private dataListener: ((chunk: Buffer | string) => void) | null = null;
   private resolveRun: ((code: number) => void) | null = null;
+  private readonly onResize = (): void => {
+    this.renderer.reset();
+    this.requestFrame();
+    this.paint();
+  };
 
   constructor(options: ProgramOptions = {}) {
     this.stdout = options.stdout ?? process.stdout;
-    this.stdin = options.stdin;
+    this.stdin = options.stdin ?? process.stdin;
     this.frameMs = options.frameMs ?? 16;
     this.inline = options.inline ?? false;
     this.mouse = options.mouse === true ? {} : options.mouse === undefined ? false : options.mouse;
     this.keyboard = options.keyboard === true;
+    const caps = detectCapabilities();
+    this.theme = options.theme ?? sleekDark;
+    this.colorLevel = options.colorLevel ?? caps.colorLevel;
     this.onKeyHook = options.onKey;
   }
 
   /** Set (or replace) the component tree. */
-  mount(container: Container): void {
+  mount(container: Layout): void {
     this.container = container;
     this.requestFrame();
   }
@@ -97,12 +126,19 @@ export class Program {
     return this.running;
   }
 
+  /** JSON tree of the mounted layout. */
+  dump(): TreeNode {
+    if (!this.container) throw new Error('[tui] dump() needs a mounted layout.');
+    this.container.resize(this.stdout.columns ?? 80, this.stdout.rows ?? 24);
+    return dumpTree(this.container);
+  }
+
   /**
    * Enter the TUI and run until {@link quit}. Resolves with the exit code
    * passed to `quit()`, disposes the program, and restores the terminal.
    */
   async run(): Promise<number> {
-    if (!this.container) throw new Error('[tui] mount() a Container before run().');
+    if (!this.container) throw new Error('[tui] mount() a layout (Container, Column, Row, Split, Stack, or Overlay) before run().');
     if (this.running) return 0;
 
     const tty = this.stdin?.isTTY === true && this.stdout.isTTY === true;
@@ -110,11 +146,11 @@ export class Program {
       this.running = true;
 
       if (!this.inline && tty) {
-        // Alt-buffer keeps the user's shell scrollback intact.
         this.stdout.write('\x1b[?1049h\x1b[H');
       }
       if (tty) {
-        this.stdout.write('\x1b[?25l'); // hide cursor
+        this.stdout.write('\x1b[?25l');
+        this.stdout.write(enableBracketedPaste());
         if (this.mouse !== false) this.stdout.write(enableMouse(this.mouse));
         if (this.keyboard) this.stdout.write(enableKittyKeyboard());
         this.exitRaw = enterRawMode(this.stdin!);
@@ -122,15 +158,16 @@ export class Program {
           for (const event of this.parser.feed(String(chunk))) {
             this.handleKey(event);
           }
-          if (this.mouse !== false) this.handleMouse(String(chunk));
+          if (this.mouse !== false) this.handleMouse(stringChunk(chunk));
         };
         this.stdin!.on('data', this.dataListener);
+        this.stdout.on?.('resize', this.onResize);
       }
 
       const code = await new Promise<number>((resolve) => {
         this.resolveRun = resolve;
         this.timer = setInterval(() => this.tick(), this.frameMs);
-        this.paint(); // synchronous first frame so headless tests see output
+        this.paint();
       });
       return code;
     } finally {
@@ -138,7 +175,6 @@ export class Program {
     }
   }
 
-  /** Request program end. Idempotent; later calls are ignored. */
   quit(exitCode = 0): void {
     if (!this.running || !this.resolveRun) return;
     const resolve = this.resolveRun;
@@ -147,26 +183,28 @@ export class Program {
   }
 
   private tick(): void {
-    // Repaint every tick: components may have mutated between frames
-    // (timers, async work), and the DiffRenderer makes an unchanged frame
-    // cost nothing but a buffer rebuild.
     this.paint();
   }
 
   private handleKey(event: KeyEvent): void {
     this.onKeyHook?.(event);
-    // Releases must not navigate widgets or quit. Games that need key-up
-    // listen on `onKey`.
     if (event.kind === 'release') return;
-    if (event.name === 'escape' || event.name === 'ctrl+c') {
-      this.quit(event.name === 'ctrl+c' ? 130 : 0);
+    if (event.name === 'ctrl+c') {
+      this.quit(130);
+      return;
+    }
+    if (event.name === 'escape') {
+      if (this.container?.handleKey(event)) {
+        this.requestFrame();
+        return;
+      }
+      this.quit(0);
       return;
     }
     this.container?.handleKey(event);
     this.requestFrame();
   }
 
-  /** Route mouse reports to the component under the cursor. */
   private handleMouse(chunk: string): void {
     const events = parseMouseEvents(chunk);
     if (events.length === 0) return;
@@ -177,16 +215,15 @@ export class Program {
 
   private paint(): void {
     if (!this.container) return;
-    const width = (this.stdout as { columns?: number }).columns ?? 80;
-    const height = (this.stdout as { rows?: number }).rows ?? 24;
+    const width = this.stdout.columns ?? 80;
+    const height = this.stdout.rows ?? 24;
+    this.container.resize(width, height);
     const buffer = new ScreenBuffer(width, height);
-    for (const [y, line] of this.container.render().entries()) {
-      [...line].forEach((char, x) => buffer.setCell(x, y, char));
-    }
-    this.renderer.paint(this.stdout, buffer);
+    blitLines(buffer, this.container.render());
+    this.renderer.paint(this.stdout, buffer, this.theme, this.colorLevel);
+    this.container.paintExtras(this.stdout, 0, 0);
   }
 
-  /** Tear down: leave alt-buffer, restore cursor, unhook input. Safe twice. */
   dispose(): void {
     if (this.timer) {
       clearInterval(this.timer);
@@ -196,16 +233,22 @@ export class Program {
       this.stdin.off('data', this.dataListener);
       this.dataListener = null;
     }
+    this.stdout.off?.('resize', this.onResize);
     this.exitRaw?.();
     this.exitRaw = null;
     const tty = this.stdin?.isTTY === true && this.stdout.isTTY === true;
     let out = '';
     if (!this.inline && tty) out += '\x1b[?1049l';
+    if (tty) out += disableBracketedPaste();
     if (this.mouse !== false && tty) out += disableMouse(this.mouse);
     if (this.keyboard && tty) out += disableKittyKeyboard();
-    out += '\x1b[?25h'; // show cursor
+    out += '\x1b[?25h';
     this.stdout.write(out);
     this.running = false;
     this.resolveRun = null;
   }
+}
+
+function stringChunk(chunk: Buffer | string): string {
+  return String(chunk);
 }

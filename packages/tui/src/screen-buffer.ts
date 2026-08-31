@@ -39,14 +39,28 @@ export class ScreenBuffer {
     return { char: this.cells[i] ?? ' ', style: this.styles[i] ?? '' };
   }
 
-  /** Overwrite the buffer's cells from an array of line strings. */
-  setLines(lines: string[], stylesByKey?: Map<string, (y: number) => string>): void {
+  setLines(lines: string[]): void {
     this.clear();
     lines.forEach((line, y) => {
-      [...line].forEach((char, x) => {
+      let x = 0;
+      for (const char of line) {
+        if (x >= this.width) break;
         this.setCell(x, y, char);
-      });
+        x += 1;
+      }
     });
+  }
+
+  /** Write a row using display width. `styleAt` picks a theme key per cell. */
+  blitLine(y: number, text: string, styleAt?: (char: string, x: number) => string): void {
+    let x = 0;
+    for (const char of text) {
+      if (x >= this.width) break;
+      const width = char === '' ? 1 : /[\u1100-\u115f\u2e80-\u9fff\uac00-\ud7a3\uf900-\ufaff\uff00-\uff60]/.test(char) ? 2 : 1;
+      this.setCell(x, y, char, styleAt?.(char, x) ?? '');
+      if (width === 2) this.setCell(x + 1, y, '', styleAt?.(char, x) ?? '');
+      x += width;
+    }
   }
 
   /** Rows as plain strings (trailing spaces trimmed per row). */

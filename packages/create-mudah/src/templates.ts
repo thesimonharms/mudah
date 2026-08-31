@@ -216,7 +216,23 @@ Create a new command:
 
 \`\`\`sh
 node bin/${name}.js make command deploy-site
+node bin/${name}.js make tui picker
 \`\`\`
+`,
+    ],
+    [
+      'AGENTS.md',
+      `# Agent notes for ${name}
+
+This app uses Mudah. For a full-screen TUI:
+
+1. Import from \`@mudah-cli/mudah/tui\` and \`@mudah-cli/mudah/testing\`.
+2. Prefer \`Screen.picker\`, \`Screen.wizard\`, or \`Screen.dashboard\` before a custom Component.
+3. Layout is \`Column\`, \`Row\`, and \`Split\` only. \`Container\` is a Column.
+4. Test with \`TestTui.mount(root).send('down').snapshot()\` and \`tree()\`. No PTY.
+5. Do not use Ink, Blessed, or raw ANSI.
+
+See the Mudah TUI skill in the framework repo: \`.cursor/skills/mudah-tui\`.
 `,
     ],
   ];

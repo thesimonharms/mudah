@@ -1,0 +1,65 @@
+# Mudah (llms.txt)
+
+TypeScript CLI/TUI framework. ESM. Node >= 26. Zero default runtime deps.
+
+## Install
+
+`@mudah-cli/mudah` is the umbrella. TUI: `@mudah-cli/mudah/tui`. Tests: `@mudah-cli/mudah/testing`.
+
+## CLI
+
+Commands: one file, default export, `signature` string `{arg?} [--flag]`. Groups: `db:status`.
+`Command.handle()` returns an exit code. `this.arg` / `this.option` / `this.output`.
+Prompts: `this.select` / `this.confirm` / `this.password`. Not a Program.
+Tests: `TestApp.create({ cwd }).dispatch(['cmd']).exit(0).outContains('...')`.
+
+## TUI: one way
+
+Depth: flags/JSON → Command. One question → prompt. Full-screen → Program.
+
+```ts
+import { Program, Screen, Column, Row, Split } from '@mudah-cli/mudah/tui';
+import { TestTui } from '@mudah-cli/mudah/testing';
+
+const screen = Screen.picker({ title: 'Env', items: ['staging', 'prod'] });
+const program = new Program();
+screen.attach(program);
+await program.run();
+screen.result();
+```
+
+Recipes first: `Screen.picker`, `Screen.wizard`, `Screen.dashboard`. Then `Form.fromSchema(s.object({...}))`. Custom `BaseComponent` last.
+
+Layout: `Column` (vertical), `Row` (horizontal), `Split` (two panes, drag bar). `Container` is a Column. No flex. No CSS.
+
+`Program.mount(layout)` then `run()`. Escape quits unless Overlay consumes it. ctrl+c = 130.
+
+## Widgets
+
+Label, Panel, List (click + arrows), MultiList, Table, Viewport, TextInput (caret, paste).
+Chrome: StatusBar, HelpFooter, Hyperlink (OSC 8), Image (Kitty or half-blocks).
+Nav: Stack (push/pop), Overlay (modal, toast, ctrl+k palette).
+Extra: Sparkline, Tree, FuzzyList.
+
+Leftover space goes to children that implement `resize` (Viewport, Table, Panel, nested layouts).
+
+## TestTui
+
+```ts
+const tui = TestTui.mount(screen.root, { cols: 80, rows: 24 });
+tui.send('down').send('enter').click(2, 3).paste('hi');
+tui.snapshot(); // ASCII
+tui.tree();     // JSON { role, name, value, focused, bounds, children }
+```
+
+No PTY. No Ink. No Blessed. No raw `\x1b[` in app code.
+
+## Scaffold
+
+`make tui picker|wizard|dashboard`
+`make command name` / `make provider name` / `make config name`
+`doctor` prints a TUI dump sample.
+
+## Forbidden
+
+Screen.* and TestTui exist. Do not invent Ink, Blessed, React-in-terminal, or a fourth layout system.

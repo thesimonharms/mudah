@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Command } from '@mudah-cli/console';
 import { detectCapabilities } from '@mudah-cli/terminal';
+import { Column, Label, List, dumpTree } from '@mudah-cli/tui';
 
 /**
  * Built-in `doctor` command: a quick health check of the runtime, manifest,
@@ -51,6 +52,12 @@ export default class DoctorCommand extends Command {
     this.output.keyValue('semantic prompts', caps.osc133 ? 'osc 133' : 'none');
     this.output.keyValue('graphics', caps.kittyGraphics ? 'kitty' : 'none');
     this.output.keyValue('keyboard', caps.kittyKeyboard ? 'kitty key-up' : 'legacy');
+
+    this.output.section('TUI');
+    const demo = new Column().add(new Label('demo'), new List(['a', 'b']));
+    demo.resize(40, 8);
+    this.output.keyValue('dump', JSON.stringify(dumpTree(demo)));
+    this.output.hint('Mount a layout and call program.dump() or TestTui.tree()');
 
     this.output.line();
     this.output.success('doctor complete');

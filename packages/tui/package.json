@@ -1,7 +1,7 @@
 {
   "name": "@mudah-cli/tui",
-  "version": "0.5.0",
-  "description": "Full-screen terminal UI toolkit: alt-buffer Program, diff rendering, mouse, Kitty keyboard, focus-managed widgets.",
+  "version": "0.8.0",
+  "description": "Full-screen terminal UI toolkit: alt-buffer Program, Row/Column/Split layout, diff rendering, mouse, Kitty keyboard, focus-managed widgets.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -18,8 +18,9 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@mudah-cli/terminal": "^0.5.0",
-    "@mudah-cli/ui": "^0.5.0"
+    "@mudah-cli/config": "^0.8.0",
+    "@mudah-cli/terminal": "^0.8.0",
+    "@mudah-cli/ui": "^0.8.0"
   },
   "publishConfig": {
     "access": "public"

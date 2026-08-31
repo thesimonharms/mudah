@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { Program } from '@mudah-cli/mudah/tui';
+import { Program, Container, Label } from '@mudah-cli/mudah/tui';
 import { sniffFormat, normalizeFormat } from '../src/image/formats.js';
 
 describe('wizard components', () => {
@@ -28,7 +28,7 @@ describe('wizard components', () => {
       },
     };
     const program = new Program({ stdout, stdin: input, frameMs: 5 });
-    program.mount({ render: () => ['convert-img — select images'], focusable: false } as never);
+    program.mount(new Container().add(new Label('convert-img — select images')));
     const pending = program.run();
     await new Promise((r) => setTimeout(r, 20));
     emitter.emit('data', '\x1b'); // esc

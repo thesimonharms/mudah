@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mudah-cli/mudah": "^0.2.0"
+    "@mudah-cli/mudah": "^0.8.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

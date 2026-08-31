@@ -150,6 +150,10 @@ class StringSchema extends BaseSchema<string> {
     return this;
   }
 
+  enumValues(): readonly string[] | undefined {
+    return this.allowed;
+  }
+
   protected check(value: unknown, path: string, issues: SchemaIssue[]): string {
     if (typeof value !== 'string') {
       this.fail(issues, path, `expected string, got ${typeName(value)}`);
@@ -333,6 +337,8 @@ function typeName(value: unknown): string {
  * class with private state).
  */
 export interface StringSchemaBuilder extends Schema<string> {
+  /** Restricted values when this node came from `s.enum`. */
+  enumValues(): readonly string[] | undefined;
   min(length: number): StringSchemaBuilder;
   max(length: number): StringSchemaBuilder;
   match(pattern: RegExp): StringSchemaBuilder;

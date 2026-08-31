@@ -1,0 +1,9 @@
+{
+  "name": "ops-desk",
+  "version": "0.1.0",
+  "bin": "ops-desk",
+  "description": "Ship a release from the terminal",
+  "ui": {
+    "theme": "auto"
+  }
+}

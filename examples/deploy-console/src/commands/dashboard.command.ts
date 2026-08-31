@@ -1,9 +1,9 @@
 import { Command } from '@mudah-cli/mudah';
-import { Container, Label, Panel, Program, Table, Viewport } from '@mudah-cli/mudah/tui';
+import { Column, Label, Panel, Program, Split, Table, Viewport } from '@mudah-cli/mudah/tui';
 
 /**
- * Full-screen dashboard: a scrolling viewport over a table of services,
- * with mouse support (wheel to scroll, click to select) and a live panel.
+ * Full-screen dashboard: a sidebar summary beside a scrolling table,
+ * with mouse support (wheel to scroll, drag the split bar, click to select).
  */
 export default class DashboardCommand extends Command {
   signature = 'dashboard';
@@ -27,18 +27,15 @@ export default class DashboardCommand extends Command {
       '',
       'up/down  move    enter  deploy',
       'wheel    scroll  esc    exit',
+      'drag     split',
     ]);
 
-    // The viewport scrolls the table when it outgrows the screen.
-    const viewport = new Viewport(table, 12);
-
     const program = new Program({ mouse: true });
-    const container = new Container()
-      .add(new Label('Deploy Console — esc to exit'))
-      .add(summary)
-      .add(viewport);
-
-    program.mount(container);
+    program.mount(
+      new Column()
+        .add(new Label('Deploy Console — esc to exit'))
+        .add(new Split({ axis: 'horizontal', ratio: 0.38 }).add(summary, new Viewport(table, 12))),
+    );
 
     const code = await program.run();
     if (code === 0) this.output.success('Dashboard closed.');

@@ -126,7 +126,7 @@ Pass a schema as the first argument and a bad value fails at import with every o
 | `@mudah-cli/ui` | Design tokens, the `sleek` theme, Output primitives (styled/plain/json), tables, panels, markdown |
 | `@mudah-cli/core` | The kernel: `Application` (extends Container), providers, events, discovery, plugins, update nudge |
 | `@mudah-cli/console` | Signatures, `Command`, grouped names (`db:status`), prompts (select/multiselect/password), the console kernel, help rendering |
-| `@mudah-cli/tui` | Full-screen apps: alt-buffer `Program`, diff renderer, tables, panels, viewports, mouse, Kitty keyboard, focus-managed widgets |
+| `@mudah-cli/tui` | Full-screen apps: alt-buffer `Program`, `Row`/`Column`/`Split` layout, diff renderer, tables, panels, viewports, mouse, Kitty keyboard |
 | `@mudah-cli/vgpu` | Optional. Run [vgpu](https://vgpu.sh/) WGSL effects and blit the pixels to the terminal (Kitty graphics, half-block fallback) |
 | `@mudah-cli/audio` | Optional. Play PCM through the OS mixer (streaming output, one-shot WAV). Kitty cannot carry audio |
 | `@mudah-cli/testing` | `TestApp` — in-process command dispatch with chained assertions |
@@ -151,6 +151,15 @@ Every package has its own npm name and depends on as little as possible, so you 
 Conversely, the umbrella (`@mudah-cli/mudah`) is the "all the parts" install: one dependency, the whole stack wired together with `run()`, auto-discovery, and built-in commands.
 
 ## Examples
+
+**[examples/ops-desk](examples/ops-desk)** — ship a release from the terminal. `Screen.picker` / `wizard`, `Form.fromSchema`, Overlay palette, Stack, FuzzyList, `TestTui`:
+
+```sh
+cd examples/ops-desk
+node bin/ops-desk.js desk          # full-screen. ctrl+k palette, esc back
+node bin/ops-desk.js env staging   # flag form, no TUI
+npm test
+```
 
 **[examples/deploy-console](examples/deploy-console)** — a deployment console that uses every v0.2 and v0.3 feature: schema-validated config, grouped commands (`deploy:`, `db:`), `--profile`, OSC 10 theme query, TUI tables/panels/viewports/mouse, the update nudge, and a plugin loaded from `node_modules` (`@thesimonharms/deploy-audit` → `audit:last`):
 
@@ -202,7 +211,7 @@ Every app ships with:
 
 - `help [command]` — command list / per-command help
 - `version` — app name + version
-- `make {command|provider|config} {name}` — scaffold new pieces with correct structure
+- `make {command|provider|config|tui} {name}` — scaffold commands, providers, config, or a TUI screen (`make tui picker`)
 - `build` — runs the app's `build` script (bun or npm) with streaming output
 - `doctor` — runtime, manifest, discovery, and terminal capability report
 - `dev {command}` — watch mode: re-runs the command on changes (150 ms debounce)
@@ -224,16 +233,19 @@ const token = await this.password('API token');                          // mask
 For full-screen interfaces, build with `@mudah-cli/tui`:
 
 ```ts
-import { Program, Container, List, Label, Panel, Table, TextInput, Viewport } from '@mudah-cli/mudah/tui';
+import { Program, Column, Split, Label, Panel, Table, Viewport } from '@mudah-cli/mudah/tui';
 
 const program = new Program({ mouse: true });
-const list = new List(items, (i) => program.quit());
 const table = new Table([{ header: 'service' }, { header: 'status' }], rows);
-program.mount(new Container().add(new Label('Deploy'), new Panel('Summary', ['ok']), new Viewport(table, 12), list, new TextInput()));
+program.mount(
+  new Column()
+    .add(new Label('Deploy'))
+    .add(new Split({ ratio: 0.3 }).add(new Panel('Summary', ['ok']), new Viewport(table, 12))),
+);
 process.exitCode = await program.run(); // alt-buffer, diff-rendered, esc to exit
 ```
 
-Widgets implement a two-method `Component` contract (`render(): string[]`, `onKey(event)`), so custom widgets are ordinary classes — focus cycling, key routing, mouse, and minimal repaints come from the container and renderer. `Table`, `Panel`, and `Viewport` cover grids, titled boxes, and scrolling windows.
+Widgets implement a two-method `Component` contract (`render(): string[]`, `onKey(event)`). Custom widgets are ordinary classes. Focus cycling, key routing, mouse, and minimal repaints come from the layout and renderer. Start from `Screen.picker`, `Screen.wizard`, or `Screen.dashboard` before a custom widget. `Column`, `Row`, and `Split` are the layout language (`Container` is a `Column`). `Table`, `Panel`, and `Viewport` cover grids, titled boxes, and scrolling windows. Test with `TestTui` from `@mudah-cli/mudah/testing`.
 
 ### Plugins
 
@@ -283,15 +295,16 @@ This repo runs on Bun for the dev loop (`bun install`, `bun x vitest`) and Node 
 
 ### Release
 
-Releases are manual — there is no CI auto-publish.
+Publishing is a single manual command — it bumps every `@mudah-cli/*` package (and pins internal deps) in lockstep, builds all packages in dependency order, then publishes them to npm in the same order:
 
 ```sh
-node scripts/release.mjs 0.5.0 --dry-run
-node scripts/release.mjs 0.5.0
-npm publish --workspaces --access public
+npm run release -- minor              # bump minor + build + publish
+npm run release -- 0.8.0              # exact version
+npm run release -- --dry-run          # preview: no files rewritten, no upload
+npm run release -- --skip-publish     # bump + build only (no npm publish)
 ```
 
-The release script bumps every package (and internal deps) in lockstep, builds, and runs `npm pack --dry-run` per package. You need an npm login with publish rights to the `@mudah-cli` org.
+`npm login` is expected to be configured beforehand — this script never stores or creates credentials, and npm itself refuses to publish when `CI=true`, so releases are always run by hand. Publishing is intentionally not part of CI (see `.github/workflows/ci.yml`).
 
 ## Design notes
 
@@ -303,7 +316,7 @@ The release script bumps every package (and internal deps) in lockstep, builds, 
 
 ## Roadmap
 
-v0.2 and v0.3 are in this tree: OSC 10 runtime theme query, config schema validation, `--profile`, the update nudge, TUI tables/panels/viewports/mouse, command groups, and plugin providers from `node_modules`. See [examples/deploy-console](examples/deploy-console).
+See [ROADMAP.md](ROADMAP.md). Current release is 0.7.0: `Stack` push/pop with a short slide (skipped when reduced-motion / CI), `Overlay`: modal, toast, `ctrl+k` palette. Escape closes the overlay first. `Form.fromSchema(s.object({...}))`, `StatusBar`, `HelpFooter` from `keys.*`, `Hyperlink` (OSC 8), `Image` (Kitty graphics or half-blocks). The TUI skill lives at [.cursor/skills/mudah-tui](.cursor/skills/mudah-tui/SKILL.md).
 
 ## License
 
