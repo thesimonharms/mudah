@@ -55,19 +55,27 @@ export const osc = {
   commandEnd(stream: OscWriter, status: number = 0): void {
     stream.write(oscSequence(133, `D;${status}`));
   },
+
+  /** OSC 7: announce the working directory so the terminal tracks cwd. */
+  workingDir(stream: OscWriter, cwd: string): void {
+    stream.write(oscSequence(7, `file://${encodeURI(cwd)}`));
+  },
 };
 
 /**
  * Wrap a stream with OSC capability guards: emitters become no-ops when the
  * capability is unavailable.
  */
-export function guardedOsc(stream: OscWriter, caps: { osc9: boolean; osc133: boolean }) {
+export function guardedOsc(stream: OscWriter, caps: { osc9: boolean; osc133: boolean; osc7: boolean }) {
   return {
     title: (title: string) => osc.title(stream, title),
     notify: (title: string, message: string) => {
       if (caps.osc9) osc.notify(stream, title, message);
     },
     hyperlink: (uri: string, text: string) => osc.hyperlink(stream, uri, text),
+    workingDir: (cwd: string) => {
+      if (caps.osc7) osc.workingDir(stream, cwd);
+    },
     promptStart: () => {
       if (caps.osc133) osc.promptStart(stream);
     },

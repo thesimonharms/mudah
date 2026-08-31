@@ -496,3 +496,85 @@ describe('update nudge', () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 });
+
+describe('command aliases & deprecation', () => {
+  const fakeCwd = '/definitely/not/an/app';
+  const baked = { name: 't', version: '0.1.0', bin: 't' };
+
+  it('dispatches via an alias', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['hi', 'world'],
+      cwd: fakeCwd,
+      manifest: baked,
+      commands: [
+        {
+          default: class extends Command {
+            signature = 'greet {name?}';
+            description = 'greet';
+            aliases = ['hi', 'hello'];
+            async handle() {
+              this.output.success(`hi ${this.arg('name') ?? 'there'}`);
+            }
+          },
+        },
+      ],
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('hi world');
+  });
+
+  it('warns on stderr when running a deprecated command', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['old'],
+      cwd: fakeCwd,
+      manifest: baked,
+      commands: [
+        {
+          default: class extends Command {
+            signature = 'old';
+            description = 'old';
+            deprecated = 'use greet instead';
+            async handle() {
+              this.output.success('ran');
+            }
+          },
+        },
+      ],
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().err).toContain('deprecated');
+    expect(s.text().out).toContain('ran');
+  });
+
+  it('renders deprecation in --help', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['old', '--help'],
+      cwd: fakeCwd,
+      manifest: baked,
+      commands: [
+        {
+          default: class extends Command {
+            signature = 'old';
+            description = 'old';
+            deprecated = 'use greet instead';
+            async handle() {
+              this.output.success('ran');
+            }
+          },
+        },
+      ],
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('Deprecated:');
+    expect(s.text().out).toContain('use greet instead');
+  });
+});

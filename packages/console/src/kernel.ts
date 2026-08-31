@@ -23,6 +23,10 @@ export interface CommandEntry {
   group?: string;
   /** Short blurb for the group, from the first command that declared one. */
   groupDescription?: string;
+  /** Alternate names that resolve to this command. */
+  aliases?: string[];
+  /** When set, the command is deprecated; a string is the deprecation reason. */
+  deprecated?: boolean | string;
 }
 
 /** A group of commands sharing a namespace. */
@@ -45,6 +49,20 @@ function groupDescriptionOf(instance: Command): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+/** Filter and dedupe aliases, excluding the canonical name. */
+function normalizeAliases(aliases: string[] | undefined, canonical: string): string[] {
+  if (!aliases) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const alias of aliases) {
+    if (!alias || alias === canonical) continue;
+    if (seen.has(alias)) continue;
+    seen.add(alias);
+    out.push(alias);
+  }
+  return out;
+}
+
 /**
  * The console kernel: command registry and dispatcher.
  *
@@ -55,11 +73,17 @@ function groupDescriptionOf(instance: Command): string | undefined {
  * 4. Inject app/output/input and call `handle()`.
  * 5. Emit `command.after` with the exit code and duration.
  *
+ * Aliases resolve to the canonical command; lifecycle events and lazy-provider
+ * booting always reference the canonical name.
+ *
  * Errors propagate to the caller (the `@mudah-cli/mudah` umbrella renders them and
  * maps them to exit codes).
  */
 export class ConsoleKernel {
   private readonly commands = new Map<string, CommandEntry>();
+  /** Alias name -> canonical command name. Kept separate from `commands` so the
+   * command list never shows alias duplicates. */
+  private readonly aliases = new Map<string, string>();
 
   constructor(
     private readonly app: Application,
@@ -94,6 +118,14 @@ export class ConsoleKernel {
       const declared = groupDescriptionOf(instance);
       if (declared !== undefined) entry.groupDescription = declared;
     }
+    const aliasList = normalizeAliases(instance.aliases, signature.name);
+    for (const alias of aliasList) {
+      // First-wins: an alias that already names a command is left untouched.
+      if (this.commands.has(alias) || this.aliases.has(alias)) continue;
+      this.aliases.set(alias, signature.name);
+    }
+    entry.aliases = aliasList;
+    entry.deprecated = instance.deprecated;
     this.commands.set(signature.name, entry);
     return this;
   }
@@ -104,11 +136,12 @@ export class ConsoleKernel {
   }
 
   has(name: string): boolean {
-    return this.commands.has(name);
+    return this.commands.has(name) || this.aliases.has(name);
   }
 
   get(name: string): CommandEntry | undefined {
-    return this.commands.get(name);
+    const canonical = this.aliases.get(name);
+    return this.commands.get(canonical ?? name);
   }
 
   /**
@@ -154,15 +187,23 @@ export class ConsoleKernel {
       });
     }
 
-    const entry = this.commands.get(name);
+    const entry = this.get(name);
     if (!entry) {
       throw new UsageError(`Unknown command "${name}".`, {
         hint: 'Run with --help to see available commands.',
       });
     }
 
-    await this.app.events().emit('command.before', { command: name, argv });
-    await this.app.bootLazyForCommand(name);
+    if (entry.deprecated) {
+      const reason = typeof entry.deprecated === 'string' && entry.deprecated.length > 0
+        ? entry.deprecated
+        : '';
+      this.output.warn(`${entry.name} is deprecated${reason ? `: ${reason}` : ''}.`);
+    }
+
+    const canonical = entry.name;
+    await this.app.events().emit('command.before', { command: canonical, argv });
+    await this.app.bootLazyForCommand(canonical);
 
     let input: ParsedInput;
     try {
@@ -182,12 +223,12 @@ export class ConsoleKernel {
     try {
       exitCode = (await command.handle()) ?? 0;
     } catch (error) {
-      await this.app.events().emit('command.error', { command: name, error });
+      await this.app.events().emit('command.error', { command: canonical, error });
       throw error;
     }
     const durationMs = Math.round(performance.now() - startedAt);
 
-    await this.app.events().emit('command.after', { command: name, exitCode, durationMs });
+    await this.app.events().emit('command.after', { command: canonical, exitCode, durationMs });
     return exitCode;
   }
 }

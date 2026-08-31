@@ -231,12 +231,26 @@ describe('osc', () => {
     expect(buffer.value).toBe('\x1b]133;A\x07\x1b]133;B\x07\x1b]133;D;0\x07');
   });
 
+  it('emits OSC 7 working-directory announcement', () => {
+    const { stream, buffer } = capture();
+    osc.workingDir(stream, '/home/simon/Projects/mudah');
+    expect(buffer.value).toBe('\x1b]7;file:///home/simon/Projects/mudah\x07');
+  });
+
   it('guardedOsc no-ops for missing capabilities', () => {
     const { stream, buffer } = capture();
-    const guarded = guardedOsc(stream, { osc9: false, osc133: false });
+    const guarded = guardedOsc(stream, { osc9: false, osc133: false, osc7: false });
     guarded.notify('T', 'M');
     guarded.promptStart();
     guarded.commandEnd(1);
+    guarded.workingDir('/x');
     expect(buffer.value).toBe('');
+  });
+
+  it('guardedOsc emits workingDir when osc7 is set', () => {
+    const { stream, buffer } = capture();
+    const guarded = guardedOsc(stream, { osc9: false, osc133: false, osc7: true });
+    guarded.workingDir('/home/simon/Projects/mudah');
+    expect(buffer.value).toBe('\x1b]7;file:///home/simon/Projects/mudah\x07');
   });
 });

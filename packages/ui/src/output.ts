@@ -241,7 +241,7 @@ export class Output {
       this.emit('data', 'markdown', text);
       return;
     }
-    this.out.write(renderMarkdown(text, { level: this.effectiveLevel(), theme: this.theme }) + '\n');
+    this.out.write(renderMarkdown(text, { level: this.effectiveLevel(), theme: this.theme, unicode: this.unicode }) + '\n');
   }
 
   /** Record an event and stream it as a JSON line (json mode only). */

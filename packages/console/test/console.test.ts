@@ -255,3 +255,71 @@ describe('help rendering', () => {
     expect(text).toContain('--help');
   });
 });
+
+describe('command aliases & deprecation', () => {
+  class ShortCommand extends Command {
+    signature = 'short {name?}';
+    description = 'Short form';
+    aliases = ['s', 'quick'];
+    async handle() {
+      this.output.success(`short ${this.arg('name') ?? 'x'}`);
+    }
+  }
+  class LegacyCommand extends Command {
+    signature = 'legacy';
+    description = 'Old thing';
+    deprecated = 'use short instead';
+    async handle() {
+      this.output.success('legacy ran');
+    }
+  }
+
+  function setupAliases(): { kernel: ConsoleKernel; holder: { out: string; output: Output } } {
+    const holder = makeOutput();
+    const kernel = new ConsoleKernel(makeApp(), holder.output);
+    kernel.register({ default: ShortCommand });
+    kernel.register({ default: LegacyCommand });
+    return { kernel, holder };
+  }
+
+  it('resolves an alias to the canonical command', async () => {
+    const { kernel } = setupAliases();
+    expect(kernel.has('quick')).toBe(true);
+    expect(kernel.get('quick')?.name).toBe('short');
+    const code = await kernel.dispatch(['s', 'world']);
+    expect(code).toBe(0);
+    expect(kernel.get('short')?.aliases).toEqual(['s', 'quick']);
+  });
+
+  it('does not duplicate aliases in the command list', () => {
+    const { kernel } = setupAliases();
+    expect(kernel.list().filter((e) => e.name === 'short')).toHaveLength(1);
+  });
+
+  it('warns when running a deprecated command', async () => {
+    const { kernel, holder } = setupAliases();
+    const code = await kernel.dispatch(['legacy']);
+    expect(code).toBe(0);
+    expect(holder.out).toContain('deprecated');
+    expect(holder.out).toContain('legacy ran');
+  });
+
+  it('renders deprecations and aliases in per-command help', () => {
+    const { kernel } = setupAliases();
+    const short = kernel.get('short')!;
+    const legacy = kernel.get('legacy')!;
+    const shortHelp: string[] = [];
+    renderCommandHelp('app', short, shortHelp);
+    const legacyHelp: string[] = [];
+    renderCommandHelp('app', legacy, legacyHelp);
+    expect(shortHelp.join('\n')).toContain('Aliases:');
+    expect(shortHelp.join('\n')).toContain('quick');
+    expect(legacyHelp.join('\n')).toContain('Deprecated:');
+    expect(legacyHelp.join('\n')).toContain('use short instead');
+  });
+
+  it('still rejects unknown commands', async () => {
+    const { kernel } = setupAliases();
+    await expect(kernel.dispatch(['nope'])).rejects.toThrow(UsageError);
+  });
+});

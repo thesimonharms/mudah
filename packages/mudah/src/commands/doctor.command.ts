@@ -50,6 +50,7 @@ export default class DoctorCommand extends Command {
     this.output.keyValue('animations', String(caps.animations));
     this.output.keyValue('notifications', caps.osc9 ? 'osc 9' : 'none');
     this.output.keyValue('semantic prompts', caps.osc133 ? 'osc 133' : 'none');
+    this.output.keyValue('cwd tracking', caps.osc7 ? 'osc 7' : 'none');
     this.output.keyValue('graphics', caps.kittyGraphics ? 'kitty' : 'none');
     this.output.keyValue('keyboard', caps.kittyKeyboard ? 'kitty key-up' : 'legacy');
 

@@ -83,6 +83,18 @@ export function renderCommandHelp(appName: string, entry: CommandEntry, lines: s
     lines.push('Description');
     lines.push(`  ${entry.description}`, '');
   }
+  if (entry.deprecated) {
+    const reason =
+      typeof entry.deprecated === 'string' && entry.deprecated.length > 0
+        ? entry.deprecated
+        : 'This command is deprecated.';
+    lines.push('Deprecated:');
+    lines.push(`  ${reason}`, '');
+  }
+  if (entry.aliases && entry.aliases.length > 0) {
+    lines.push('Aliases:');
+    lines.push(`  ${entry.aliases.join(', ')}`, '');
+  }
   if (entry.signature.args.length > 0) {
     lines.push('Arguments:');
     const width = Math.max(...entry.signature.args.map((a) => a.name.length)) + 2;

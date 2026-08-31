@@ -19,6 +19,8 @@ export interface TerminalCapabilities {
   readonly osc9: boolean;
   /** OSC 133 semantic prompt markers (Kitty, WezTerm, iTerm2, VS Code, foot). */
   readonly osc133: boolean;
+  /** OSC 7 working-directory tracking (cwd announcements). Widely supported; emitted on a TTY. */
+  readonly osc7: boolean;
   /**
    * The terminal answers OSC 10/11 color queries, so its theme can be read
    * at runtime. Everything modern does; dumb terminals and CI do not.
@@ -97,6 +99,7 @@ export function detectCapabilities(options: DetectCapabilitiesOptions = {}): Ter
     osc9: brand === 'ghostty' || brand === 'wezterm',
     osc133:
       brand === 'kitty' || brand === 'wezterm' || brand === 'iterm' || brand === 'vscode' || brand === 'foot',
+    osc7: isTty,
     themeQuery: isTty && brand !== 'apple-terminal' && env['TERM'] !== 'dumb',
     kittyGraphics: isTty && (brand === 'ghostty' || brand === 'kitty' || brand === 'wezterm'),
     kittyKeyboard: isTty && (brand === 'ghostty' || brand === 'kitty' || brand === 'wezterm'),

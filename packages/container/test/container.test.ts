@@ -123,6 +123,36 @@ describe('Container', () => {
     expect(isClassLike(Bound)).toBe(true);
   });
 
+  it('isBound() reports only explicit bindings, not auto-injectable classes', () => {
+    const c = new Container();
+    class Plain {}
+    c.singleton('logger', Logger);
+    expect(c.isBound('logger')).toBe(true);
+    expect(c.isBound('missing')).toBe(false);
+    expect(c.isBound(Plain)).toBe(false);
+  });
+
+  it('bindings() lists explicitly registered abstracts', () => {
+    const c = new Container();
+    const sym = Symbol('svc');
+    c.bind('logger', Logger);
+    c.singleton(sym, () => 1);
+    expect(c.bindings()).toHaveLength(2);
+    expect(c.bindings()).toContain('logger');
+    expect(c.bindings()).toContain(sym);
+  });
+
+  it('instances() lists resolved shared instances after a make()', () => {
+    const c = new Container();
+    c.singleton('logger', Logger);
+    c.instance('name', 'injected');
+    // instance() caches immediately; singleton resolves lazily on make()
+    expect(c.instances()).toContain('name');
+    expect(c.instances()).not.toContain('logger');
+    c.make('logger');
+    expect(c.instances()).toContain('logger');
+  });
+
   it('throws BindingResolutionException for unknown abstracts', () => {
     const c = new Container();
     expect(() => c.make('never-bound')).toThrow(BindingResolutionException);
@@ -143,5 +173,38 @@ describe('Container', () => {
     c.bind('b', B);
     expect(() => c.make('a')).toThrow(CircularDependencyException);
     expect(() => c.make('a')).toThrow(/a -> b -> a/);
+  });
+
+  it('tags resolve every abstraction sharing a tag, in registration order', () => {
+    const c = new Container();
+    c.bind('a', () => ({ id: 'a' }));
+    c.bind('b', () => ({ id: 'b' }));
+    c.tag('a', 'admin');
+    c.tag('b', 'admin', 'billing');
+    expect(c.tagged<{ id: string }>('admin').map((r) => r.id)).toEqual(['a', 'b']);
+    expect(c.tagged<{ id: string }>('billing').map((r) => r.id)).toEqual(['b']);
+    expect(c.tagged('missing')).toEqual([]);
+  });
+
+  it('scoped bindings are transient outside a scope but shared inside one', () => {
+    const c = new Container();
+    let created = 0;
+    c.scoped('conn', () => ({ id: ++created }));
+    expect(c.make<{ id: number }>('conn').id).toBe(1);
+    expect(c.make<{ id: number }>('conn').id).toBe(2);
+
+    let scopedA: unknown;
+    let scopedB: unknown;
+    c.runInScope((container) => {
+      scopedA = container.make('conn');
+      scopedB = container.make('conn');
+    });
+    expect(scopedA).toBe(scopedB);
+
+    let scopedC: unknown;
+    c.runInScope((container) => {
+      scopedC = container.make('conn');
+    });
+    expect(scopedC).not.toBe(scopedA);
   });
 });

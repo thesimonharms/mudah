@@ -34,6 +34,11 @@ export abstract class Command {
    */
   groupDescription = '';
 
+  /** Additional names that also resolve to this command. */
+  aliases?: string[];
+  /** When set, the command is deprecated; a string is the deprecation reason. */
+  deprecated?: boolean | string;
+
   /** The application (container, config, events). */
   app!: Application;
   /** Styled output for the user. */

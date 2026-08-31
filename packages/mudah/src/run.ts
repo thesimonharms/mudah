@@ -9,7 +9,7 @@ import {
   type MudahManifest,
   type UpdateCheckOptions,
 } from '@mudah-cli/core';
-import { detectCapabilities, type TerminalCapabilities, type ThemeQueryInput } from '@mudah-cli/terminal';
+import { detectCapabilities, osc, type TerminalCapabilities, type ThemeQueryInput } from '@mudah-cli/terminal';
 import { Output, detectTheme, renderTable } from '@mudah-cli/ui';
 import { ConsoleKernel, renderError, renderCommandHelp, renderCommandList, parseSignature, type CommandModule } from '@mudah-cli/console';
 import HelpCommand from './commands/help.command.js';
@@ -17,6 +17,7 @@ import VersionCommand from './commands/version.command.js';
 import MakeCommand from './commands/make.command.js';
 import BuildCommand from './commands/build.command.js';
 import DoctorCommand from './commands/doctor.command.js';
+import ConfigShowCommand from './commands/config.show.command.js';
 import DevCommand from './commands/dev.command.js';
 
 export interface RunOptions {
@@ -126,6 +127,10 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const jsonMode = output.isMachineReadable;
   const profileMode = argv.includes('--profile');
   const startedAt = Date.now();
+
+  // Advertise the working directory (OSC 7) once on launch so terminals that
+  // track cwd pick it up. Skipped off-TTY and in JSON mode so logs stay clean.
+  if (caps.osc7 && !jsonMode) osc.workingDir(stdout, cwd);
 
   // Update nudge: opt-in per app (a package name must be given) and never in
   // the way of scripts, CI, or machine-readable output.
@@ -369,6 +374,7 @@ function registerBuiltIns(kernel: ConsoleKernel): void {
   kernel.register({ default: MakeCommand });
   kernel.register({ default: BuildCommand });
   kernel.register({ default: DoctorCommand });
+  kernel.register({ default: ConfigShowCommand });
   kernel.register({
     default: class extends DevCommand {
       constructor() {

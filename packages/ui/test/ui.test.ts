@@ -211,4 +211,29 @@ describe('renderMarkdown', () => {
     const text = renderMarkdown('**bold**', { level: 24 });
     expect(text).toContain('\x1b[1m');
   });
+
+  it('renders fenced code blocks as themed panels', () => {
+    const out = renderMarkdown('```js\nconst x = 1\n```', { level: 0, unicode: true });
+    expect(out).toContain('js');
+    expect(out).toContain('const x = 1');
+    expect(out).toContain('│');
+  });
+
+  it('renders fenced code blocks without a language label', () => {
+    const out = renderMarkdown('```\nplain code\n```', { level: 0, unicode: true });
+    expect(out).toContain('plain code');
+    expect(out).toContain('╭');
+  });
+
+  it('preserves blank lines inside code blocks', () => {
+    const out = renderMarkdown('```\nline one\n\nline three\n```', { level: 0, unicode: true });
+    expect(out).toContain('line one');
+    expect(out).toContain('line three');
+  });
+
+  it('falls back to ascii borders without unicode', () => {
+    const out = renderMarkdown('```\nplain code\n```', { level: 0, unicode: false });
+    expect(out).toContain('plain code');
+    expect(out).toContain('+');
+  });
 });
