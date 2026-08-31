@@ -111,6 +111,53 @@ describe('Form.fromSchema', () => {
   });
 });
 
+describe('Screen.form', () => {
+  it('builds a FormScreen from a schema and submits its values', () => {
+    const screen = Screen.form({
+      title: 'New user',
+      schema: s.object({
+        name: s.string(),
+        admin: s.boolean(),
+      }),
+    });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    expect(tui.snapshot()).toContain('New user');
+    // Tab to the boolean field, toggle it, then submit.
+    tui.send('tab').send('space').send('enter');
+    expect(screen.result()?.admin).toBe(true);
+  });
+});
+
+describe('Screen.table', () => {
+  it('selects a row and returns the row data', () => {
+    const screen = Screen.table({
+      title: 'Hosts',
+      columns: [{ header: 'Host' }, { header: 'Status' }],
+      rows: [['db', 'up'], ['web', 'down']],
+    });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    expect(tui.snapshot()).toContain('Hosts');
+    expect(tui.snapshot()).toContain('db');
+    // Move to the second row, then confirm — fires onSelect with the row.
+    screen.table.move(1);
+    screen.table.confirm();
+    expect(screen.result()).toEqual(['web', 'down']);
+  });
+
+  it('returns the selected index when select is true', () => {
+    const screen = Screen.table({
+      title: 'Hosts',
+      columns: [{ header: 'Host' }],
+      rows: [['db', 'up'], ['web', 'down']],
+      select: true,
+    });
+    TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    screen.table.move(0);
+    screen.table.confirm();
+    expect(screen.result()).toBe(0);
+  });
+});
+
 describe('Overlay', () => {
   it('consumes escape while a modal is open', () => {
     const overlay = new Overlay(new Column().add(new Label('base')));

@@ -1,10 +1,12 @@
 import type { KeyEvent } from '@mudah-cli/terminal';
+import type { Schema } from '@mudah-cli/config';
 import { Column, Split, type Layout } from './layout.js';
 import { BaseComponent } from './component.js';
 import type { Program } from './program.js';
 import { HelpFooter } from './chrome.js';
 import { keys } from './keymap.js';
 import { Label, List, Panel, Table, Viewport, type TableColumnDef } from './widgets.js';
+import { Form } from './form.js';
 
 export interface PickerOptions {
   title?: string;
@@ -21,14 +23,6 @@ export interface WizardStep {
 export interface WizardOptions {
   title?: string;
   steps: WizardStep[];
-}
-
-export interface DashboardOptions {
-  title?: string;
-  sidebar?: string[];
-  columns: TableColumnDef[];
-  rows: string[][];
-  ratio?: number;
 }
 
 /**
@@ -194,6 +188,35 @@ export class WizardScreen extends ScreenHandle<Record<string, unknown>> {
   }
 }
 
+export interface FormOptions {
+  title?: string;
+  schema: Schema<unknown>;
+}
+
+/** A wizard-style form screen backed by a config schema. */
+export class FormScreen extends ScreenHandle<Record<string, unknown>> {
+  readonly root: Column;
+  private readonly form: Form;
+
+  constructor(options: FormOptions) {
+    super();
+    this.form = Form.fromSchema(options.schema, options.title ?? 'Form');
+    this.root = this.form.root;
+    this.form.onComplete((values) => {
+      this.value = values;
+      this.done?.();
+    });
+  }
+}
+
+export interface DashboardOptions {
+  title?: string;
+  sidebar?: string[];
+  columns: TableColumnDef[];
+  rows: string[][];
+  ratio?: number;
+}
+
 export class DashboardScreen extends ScreenHandle<number> {
   readonly root: Column;
   readonly table: Table;
@@ -216,8 +239,38 @@ export class DashboardScreen extends ScreenHandle<number> {
   }
 }
 
+export interface TableOptions {
+  title?: string;
+  columns: TableColumnDef[];
+  rows: string[][];
+  /** When set, returns the selected row index; otherwise returns the row itself. */
+  select?: boolean;
+}
+
+/** A selectable table screen. Returns the selected row (or index when `select`). */
+export class TableScreen extends ScreenHandle<string[] | number> {
+  readonly root: Column;
+  readonly table: Table;
+
+  constructor(options: TableOptions) {
+    super();
+    const onSelect = (index: number): void => {
+      this.value = options.select ? index : options.rows[index] ?? [];
+      this.done?.();
+    };
+    this.table = new Table(options.columns, options.rows, onSelect);
+    this.root = new Column().add(
+      new Label(options.title ?? 'Table'),
+      new Viewport(this.table, 12),
+      new HelpFooter({ ...keys.table, escape: 'quit' }),
+    );
+  }
+}
+
 export const Screen = {
   picker: (options: PickerOptions): PickerScreen => new PickerScreen(options),
   wizard: (options: WizardOptions): WizardScreen => new WizardScreen(options),
+  form: (options: FormOptions): FormScreen => new FormScreen(options),
+  table: (options: TableOptions): TableScreen => new TableScreen(options),
   dashboard: (options: DashboardOptions): DashboardScreen => new DashboardScreen(options),
 };

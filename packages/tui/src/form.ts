@@ -50,6 +50,7 @@ class FormBody extends BaseComponent {
   private enumIndex = 0;
 
   constructor(
+    private title: string,
     private fields: Field[],
     private onSubmit: (values: Record<string, unknown>) => void,
   ) {
@@ -63,7 +64,7 @@ class FormBody extends BaseComponent {
   }
 
   override render(): string[] {
-    const lines = ['Form'];
+    const lines = [this.title];
     this.fields.forEach((field, i) => {
       const pointer = i === this.index ? '▸ ' : '  ';
       let value = String(this.values[field.name] ?? '');
@@ -144,16 +145,16 @@ export class Form {
   private submitted: Record<string, unknown> | undefined;
   private done: (() => void) | undefined;
 
-  private constructor(fields: Field[]) {
-    const body = new FormBody(fields, (values) => {
+  private constructor(fields: Field[], title = 'Form') {
+    const body = new FormBody(title, fields, (values) => {
       this.submitted = values;
       this.done?.();
     });
     this.root = new Column().add(body, new HelpFooter(keys.form));
   }
 
-  static fromSchema(schema: Schema<unknown>): Form {
-    return new Form(fieldsFrom(schema));
+  static fromSchema(schema: Schema<unknown>, title = 'Form'): Form {
+    return new Form(fieldsFrom(schema), title);
   }
 
   result(): Record<string, unknown> | undefined {

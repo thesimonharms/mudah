@@ -43,10 +43,13 @@ export {
   PickerScreen,
   WizardScreen,
   DashboardScreen,
-  type PickerOptions,
+  FormScreen,
+  TableScreen,
   type WizardOptions,
   type WizardStep,
   type DashboardOptions,
+  type FormOptions,
+  type TableOptions,
 } from './screens.js';
 export { Stack } from './stack.js';
 export { Overlay, type PaletteItem } from './overlay.js';
