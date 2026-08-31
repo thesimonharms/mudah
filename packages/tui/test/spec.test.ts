@@ -10,6 +10,7 @@ import {
   Label,
   List,
   Overlay,
+  ProgressBar,
   Radio,
   Screen,
   Sparkline,
@@ -282,5 +283,28 @@ describe('Radio', () => {
     expect(radio.render()).toEqual(['○ a', '● b']);
     radio.onKey({ name: 'enter' });
     expect(picked).toBe('B');
+  });
+});
+
+describe('ProgressBar', () => {
+  it('draws a half-filled bar', () => {
+    const bar = new ProgressBar(0.5, { width: 4 });
+    expect(bar.render()).toEqual(['[██  ] 50%']);
+  });
+
+  it('clamps the fraction to 0..1', () => {
+    const bar = new ProgressBar(1.5);
+    expect(bar.progress).toBe(1);
+    bar.setProgress(-1);
+    expect(bar.progress).toBe(0);
+  });
+
+  it('uses ascii blocks without unicode and hides the percent', () => {
+    const bar = new ProgressBar(0.25, { width: 4, unicode: false, showPercent: false, label: 'load' });
+    expect(bar.render()).toEqual(['load [#   ]']);
+  });
+
+  it('is not focusable', () => {
+    expect(new ProgressBar().focusable).toBe(false);
   });
 });

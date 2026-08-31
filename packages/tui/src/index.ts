@@ -11,6 +11,7 @@ export {
   List,
   MultiList,
   Panel,
+  ProgressBar,
   Radio,
   Table,
   Tabs,
