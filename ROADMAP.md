@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: **0.7.0** (published). The 0.8.0 working tree is in progress (unreleased): `Stack`, `Overlay`, `Form`, `StatusBar`/`HelpFooter`, `Hyperlink`, `Image`, plus `Sparkline`/`Tree`/`FuzzyList` and cell-level `DiffRenderer` are built and tested but not yet on the registry. The [TUI skill](.cursor/skills/mudah-tui/SKILL.md) and [llms.txt](llms.txt) are the agent surface.
+Current release: **0.7.0** (published). The 0.8.0 working tree is in progress (unreleased). The [TUI skill](.cursor/skills/mudah-tui/SKILL.md) and [llms.txt](llms.txt) are the agent surface. See `## Feature backlog` for the modular wishlist organized by package; see `## In tree, unreleased (0.8.0 prep)` for what already exists but isn't published yet.
 
 ## Shipped
 
@@ -22,68 +22,95 @@ OSC 10/11 theme query, config schemas, `--profile`, update nudge, Table/Panel/Vi
 - `Hyperlink` (OSC 8)
 - `Image` (Kitty graphics or half-blocks)
 
-### In tree, unreleased (0.8.0 prep)
+## In tree, unreleased (0.8.0 prep)
+
+Pre-existing in the tree before this pass (built and tested, not yet released):
 - `Sparkline`, `Tree`, `FuzzyList` (`extras.ts`, `fuzzy.ts`)
 - Cell-level `DiffRenderer`
 - `doctor` TUI dump via `dumpTree` + `TestTui.tree()`
+- Container: lazy/factory bindings, circular-dep detection, contextual/auto-injection, scoped (request) lifetime
+- Config: env + file sources, schema validation, `env`/`loadEnvFile`, `ConfigRepository` dotted API
+- Terminal: OSC 10/11 theme query, OSC 9 (Ghostty/WezTerm) notifications, OSC 7 working-directory, raw mode + bracketed paste enable/disable, Kitty keyboard protocol, Kitty graphics (image upload), mouse parsing
+- Console: command groups + bare-namespace `group:default` fallback, signature parser (`{name?}`, `{name=default}`, `{paths...}`), `ArgumentParseError`, grouped + per-command help, `--profile`/`--json`/`--plain` modes
+- Animation: `Spinner`, `TaskTree` with per-task lifecycle, `TaskRunner`
+- UI: `Output` (styled/plain/json modes, envelopes, table/panel/markdown/panel), theme-aware syntax-highlighted code blocks, color/blend helpers, `Hyperlink`, `Image`
+- Core: `Application`, providers (register/boot/lazy/evaluate), plugin discovery, plugin commands, `CheckForUpdate`/nudge, manifest/loader
+- TUI: `Row`/`Column`/`Split`/`Stack`/`Overlay`/`Form`/`StatusBar`/`HelpFooter`/`Tabs`/`TabBar`, `Hyperlink`, `Image`, `Viewport`/`View`/`Paint`/`List`/`TextInput`, `TestTui` (mount/send/click/paste/snapshot/tree)
+- Testing: `TestApp`, `TestTui`
+
+Built this session (newly committed), modularly per package:
+- `@mudah-cli/container` — introspection API `bindings()`, `instances()`, `isBound(name)`; tagged bindings (`tag(...)`/`tagged(tag)`) resolved through a tag index
+- `@mudah-cli/config` — `redactSecrets` + `REDACT_KEYS` (key-name-based secret masking), reused by the config commands
+- `@mudah-cli/terminal` — OSC 7 `osc.workingDir(stream, cwd)` + `osc7` capability + `guardedOsc.workingDir`; wired into `run()` (TTY + non-JSON only) and reported in `doctor`
+- `@mudah-cli/core` + `@mudah-cli/console` — command **aliases** (`aliases:` field, kernel resolves alias→canonical name, first registration wins) and **deprecation** (`deprecated:` field → emits a muted warning; `--deprecated` flag lets callers force-run); help lists/hides accordingly
+- `@mudah-cli/ui` — `renderBarChart(entries, {level,width,unicode,labels})` theme-aware horizontal bar chart (determinate, scaled to max value)
+- `@mudah-cli/animation` — `TaskTree` explicit dependency edges between tasks
+- `@mudah-cli/tui` — `Tabs` / `TabBar` widget (keyboard + mouse selection, scroll arrows, active-state sync)
+- `@mudah-cli/mudah` — built-in `config:show {key?}` (redacted, `--json` envelope) and `config:diff {baseline?}` (`+`/`-`/`~` flat diff vs a baseline JSON file, secrets masked)
 
 ## Feature backlog (modular, by package)
 
 ### `@mudah-cli/container` (IoC)
 - Lazy/factory bindings resolved on first `make()`
-- Scoped (request) lifetime in addition to singleton/transient
 - Context-aware bindings (`when(tenant).use(...)`)
 - Decorator injection (`@inject`, `@singleton`) behind `isolatedModules`-safe transform
-- Circular-dependency detection with a path in the error
-- Container introspection: `bindings()`, `instances()`, `isBound(name)`
-- Tagged bindings + tagged resolvers (`tag(tag)` / `taggedBy(tag)`)
+- Provider module factory: a `providers.ts` export array + auto-loader (Angular-style)
+- Container-scoped disposal (`dispose()` on shutdown)
+- `container.bindings()`/`instances()` introspection query API (filter by tag/group)
+- Container snapshot/rollback for deterministic tests
+- Async factories / promises in the resolution graph
+- `runInScope(group, () => ...)` scoped lifetime accessor
 
 ### `@mudah-cli/config`
 - Remote config source (`remote:` provider, fetch + 24h cache, like the update nudge)
 - Secrets drivers (env, file, OS keyring) with redaction in `dump()`/`debug`
-- `config:show {key?}` and `config:diff` built-in commands
-- Schema-powered `mudah.json` IntelliSense package (`@mudah-cli/config/types`)
-- Validation issue hints at import listing every offending key (already ships)
+- `config:set {key} {value}` built-in (typed to existing keys, rejects schema violations)
+- `config:validate` built-in (runs schema, surfaces issues + hint)
+- `config:source {key}` — show which file/env/layer a key resolved from (precedence)
+- Config file watch + hot-reload on change (SIGUSR1)
+- Layered config precedence display (defaults < file < env < flag)
 
 ### `@mudah-cli/terminal`
-- OSC 7 (working directory) emission + cwd updates
-- OSC 9.1/9.2 notification sequences
 - Theme-change listener: re-query OSC 10/11 on SIGWINCH
 - True-color palette sniff + 256/16/true fallback picker
-- Normalized modifier/alt-key parsing across Kitty/legacy
+- Normalized modifier/alt-key parsing across Kitty/legacy (escape sequences)
+- Terminal size poll via ioctl with a `tput cols` fallback
+- OSC 9.1/9.2 notification variants (progress, bell)
 - Bracketed-paste delivery in full-screen apps as a single `paste` event
+- `enterRawMode`/raw-mode helpers for full-screen TUI apps
 
 ### `@mudah-cli/animation`
 - `ProgressBar` with ETA and determinate/indeterminate modes
-- `TaskTree` with explicit dependency edges between tasks
 - Per-tick hooks (`onStart`, `onProgress`, `onComplete`)
-- Easing presets for spinners/transitions
+- Easing presets for spinners/transitions (linear, ease-in-out, bounce, elastic)
+- Frame-rate independent animation clock (delta-time based)
 
 ### `@mudah-cli/ui`
-- Theme-aware syntax-highlighted code blocks in panels
-- Markdown tables rendered as `Table` widgets
-- Mini bar-chart + line-chart primitives (alongside `Sparkline`)
+- Mini bar-chart + line-chart primitives (bar chart already in tree)
 - Diff/icon glyphs (added/modified/deleted) in output
+- Markdown tables rendered as `Table` widgets
+- Markdown task-list (`- [x]`) → checkbox rendering
 - Semantic `paint()` token reference documented per theme
+- `paintToken(token, level)` palette for consistent highlighting across widgets
 
 ### `@mudah-cli/core`
-- Command aliases (one handler, multiple signatures)
-- Command deprecation with a `--deprecated` warning
-- `command.before` / `command.after` middleware pipeline (auth, rate-limit, dry-run)
-- `command.stash` — snapshot command output for `command.undo`/replay
-- Async result envelope refinements under `--json`
-- Permission scopes per command (declarative `authorize()`)
+- `--timeout` / `--memory` guards per command (auto-abort, exit 137/124)
+- Command input/output stream redirection API
+- Exit-code registry (`Command.exitMap`) for documented non-zero codes
+- Event bus: `app.on('booted')`, `on('shutdown')`, `on('config:changed')`
+- Plugin dependency graph resolution at boot
+- Async `evaluateLazy()` predicate provider gating
 
 ### `@mudah-cli/console`
 - Tab completion for commands, args, and options
 - Persistent command history (readline-style) per app
 - Typed argument coercion (`int`, `float`, `path`, `glob`, `enum`)
-- Variadic positionals + `{name=default}` defaults (signature parser refinements)
 - Man-page-style grouped help rendering
+- Fuzzy command lookup on typo (did-you-mean via `FuzzyList`)
+- Subcommand aliases (e.g. `db:ls` ↔ `db:list`)
 
 ### `@mudah-cli/tui` — widgets
-- `Tabs` / `TabBar` (keyboard + mouse, scrollable)
-- `Breadcrumb` (trailing-ellipsis)
+- `Breadcrumb` (trailing-ellipsis, clickable crumbs)
 - `Calendar` / `DatePicker` (arrow + typing)
 - `FileBrowser` (tree file picker, with `FuzzyList` filter)
 - `MenuBar` (pull-down menus, alt-underline access keys)
@@ -96,23 +123,26 @@ OSC 10/11 theme query, config schemas, `--profile`, update nudge, Table/Panel/Vi
 - `Spinner` widget (animation-driven)
 - `Pager` (less-like: search, jump, scrollback)
 - `MetricGauge` (mini dial / progress ring)
-- Focus-trap + arrow-key focus traversal policy
-- Themeable widget skins via `ui.theme` token overrides
+- `TreeView` (expand/collapse + keyboard nav)
+- `Chart` widget wrapping the ui bar/line chart primitives
 
 ### `@mudah-cli/tui` — `Screen.*` flows
-- `Screen.tabs` (named tabs workflow)
-- `Screen.form` (wizard built from a schema, reuses `Form`)
-- `Screen.table` (CRUD over rows)
+- `Screen.form` (wizard built from a `Form.fromSchema`)
 - `Screen.tree` (navigable tree + result)
-- `Screen.menu` (command palette over a menu)
+- `Screen.table` (CRUD over rows)
+- `Screen.pivot` (pivot-table over rows)
+- `Screen.split` (side-by-side master/detail)
 - `Screen.notifications` (toast log center)
+- `Screen.menu` (command palette over a menu)
 
 ### `@mudah-cli/testing`
 - Style/ANSI assertions in snapshots (`expect(snap).toHaveColor('green')`)
 - Text-tree visual diff (char-level diff of `snapshot()`)
+- `tui.snapshot()` baseline file format + `--update` flag
 - Time-travel: `tui.undo()` / `tui.redo()` for stepping
 - First-class FS + network mock helpers
-- Boot/perf budget assertions (`expect(tui).toBeFast()`)
+- `tui.measure()` perf/budget assertions (`expect(tui).toBeFast()`)
+- Mock plugin registry + factory for kernel tests
 
 ### `@mudah-cli/vgpu` (optional)
 - WGSL shader hot-reload (`--watch`)
@@ -120,19 +150,23 @@ OSC 10/11 theme query, config schemas, `--profile`, update nudge, Table/Panel/Vi
 - Audio-reactive shaders synced to `@mudah-cli/audio`
 - Framebuffer capture to PNG
 - Shader parameter sliders rendered as a TUI overlay
+- Shader `import` / include path resolution in WGSL
+- Compute-shader pass for particle physics
 
 ### `@mudah-cli/audio` (optional)
 - WAV/MP3 decode + streaming playback
 - Tone-sequence DSL (note/duration)
 - Beat/tempo sync (`bpm` clock source)
 - Ducking + channel mixing
+- Beat-grid quantizer
+- Live microphone input + FFT band extraction
 - Audio-reactive event bridge (for vgpu)
 
 ## Cross-cutting
 - Plugin marketplace discovery (`mudah plugins list/update`)
 - Plugin compatibility gates (peer range + runtime feature flags)
 - `--profile` write per-provider timings to a JSON file for flamegraphing
-- `mudah info` machine-readable env/health report (JSON)
+- `mudah info` machine-readable env/health report (`--json`)
 - Opt-in boot/perf telemetry (disabled by default, opt-in via `mudah.json`)
 - i18n strings for command descriptions + prompts
 - Accessibility tree export (`--a11y-tree`) for CI checks
