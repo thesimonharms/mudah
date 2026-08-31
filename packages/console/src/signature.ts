@@ -1,9 +1,15 @@
+import { resolve as resolvePath } from 'node:path';
+
 export interface ParsedArg {
   name: string;
   optional: boolean;
   defaultValue?: string;
   /** Variadic: collects all remaining positionals (`{paths...}`). */
   variadic?: boolean;
+  /** Optional declared type, e.g. `{count:int}` or `{mode:enum[a,b]}`. */
+  type?: CoercionType;
+  /** Allowed values for an `enum` argument. */
+  enumValues?: string[];
 }
 
 export interface ParsedOption {
@@ -11,6 +17,10 @@ export interface ParsedOption {
   /** Takes a value (`--env=production`). */
   takesValue: boolean;
   defaultValue?: string;
+  /** Optional declared type, e.g. `[port:int]` or `[mode:enum[a,b]]`. */
+  type?: CoercionType;
+  /** Allowed values for an `enum` option. */
+  enumValues?: string[];
 }
 
 export interface ParsedSignature {
@@ -20,10 +30,10 @@ export interface ParsedSignature {
 }
 
 export interface ParsedInput {
-  args: Record<string, string>;
+  args: Record<string, string | number>;
   /** Variadic arg values, keyed by arg name (only for `{name...}`). */
   lists: Record<string, string[]>;
-  options: Record<string, string | boolean>;
+  options: Record<string, string | number | boolean>;
 }
 
 /**
@@ -54,15 +64,23 @@ export function parseSignature(signature: string): ParsedSignature {
     const inner = match[1]!;
     // Non-greedy name so trailing "..." is captured by the variadic group,
     // not eaten by the name character class.
-    const parsed = /^([a-zA-Z][\w:.-]*?)(\?)?(\.\.\.)?(?:=(.*))?$/.exec(inner);
+    const parsed =
+      /^([a-zA-Z][\w.-]*?)(?::(int|float|path|glob|enum(?:\[[^\]]*\])?))?(\?)?(\.\.\.)?(?:=(.*))?$/.exec(inner);
     if (!parsed) {
       throw new Error(`[console] Invalid argument syntax "{${inner}}" in signature "${signature}".`);
     }
-    const isVariadic = parsed[3] !== undefined;
-    if (isVariadic && parsed[4] !== undefined) {
+    const rawType = parsed[2] ?? '';
+    const isEnum = rawType.startsWith('enum');
+    const type = isEnum ? 'enum' : rawType;
+    const enumValues = isEnum ? extractEnumValues(rawType) : undefined;
+    const isVariadic = parsed[4] !== undefined;
+    if (isVariadic && type) {
+      throw new Error(`[console] Variadic argument "{${inner}}" cannot declare a type; coerce list elements in the command.`);
+    }
+    if (isVariadic && parsed[5] !== undefined) {
       throw new Error(`[console] Variadic argument "{${inner}}" cannot take a default value.`);
     }
-    if (isVariadic && parsed[2] === '?') {
+    if (isVariadic && parsed[3] === '?') {
       throw new Error(`[console] Variadic argument "{${inner}}" cannot also be optional.`);
     }
     if (isVariadic) {
@@ -73,23 +91,31 @@ export function parseSignature(signature: string): ParsedSignature {
     }
     result.args.push({
       name: parsed[1]!,
-      optional: parsed[2] === '?',
+      optional: parsed[3] === '?',
       ...(isVariadic ? { variadic: true } : {}),
-      defaultValue: parsed[4],
+      defaultValue: parsed[5],
+      ...(type ? { type: type as CoercionType, enumValues } : {}),
     });
   }
   if (variadicIndex !== -1 && variadicIndex !== result.args.length - 1) {
     throw new Error(`[console] Variadic argument must be the final argument in signature "${signature}".`);
   }
 
-  for (const match of trimmed.matchAll(/\[-{2}([a-zA-Z][\w-]*)(?:=([^}\]]*))?\]/g)) {
+  for (const match of trimmed.matchAll(/\[-{2}([a-zA-Z][\w-]*)(?::(int|float|path|glob|enum(?:\[[^\]]*\])?))?(?:=([^}\]]*))?\]/g)) {
     const name = match[1]!;
-    const takesValue = match[2] !== undefined;
-    result.options.push({
-      name,
-      takesValue,
-      defaultValue: takesValue ? match[2] : undefined,
-    });
+    const rawType = match[2] ?? '';
+    const isEnum = rawType.startsWith('enum');
+    const type = isEnum ? 'enum' : rawType;
+    const enumValues = isEnum ? extractEnumValues(rawType) : undefined;
+    const defaultValue = match[3];
+    const takesValue = defaultValue !== undefined || type !== '';
+    const option: ParsedOption = { name, takesValue };
+    if (defaultValue !== undefined) option.defaultValue = defaultValue;
+    if (type) {
+      option.type = type as CoercionType;
+      option.enumValues = enumValues;
+    }
+    result.options.push(option);
   }
 
   return result;
@@ -113,10 +139,13 @@ export function parseInput(signature: ParsedSignature, argv: string[]): ParsedIn
     }
     if (token.startsWith('--')) {
       const eq = token.indexOf('=');
+      const name = eq === -1 ? token.slice(2) : token.slice(2, eq);
+      const option = signature.options.find((o) => o.name === name);
       if (eq === -1) {
-        input.options[token.slice(2)] = true;
+        input.options[name] = true;
       } else {
-        input.options[token.slice(2, eq)] = token.slice(eq + 1);
+        const raw = token.slice(eq + 1);
+        input.options[name] = option ? coerceValue(raw, option.type, option.enumValues) : raw;
       }
       continue;
     }
@@ -144,9 +173,9 @@ export function parseInput(signature: ParsedSignature, argv: string[]): ParsedIn
   fixedArgs.forEach((arg, index) => {
     const value = positionals[index];
     if (value !== undefined) {
-      input.args[arg.name] = value;
+      input.args[arg.name] = coerceValue(value, arg.type, arg.enumValues);
     } else if (arg.defaultValue !== undefined) {
-      input.args[arg.name] = arg.defaultValue;
+      input.args[arg.name] = coerceValue(arg.defaultValue, arg.type, arg.enumValues);
     } else if (!arg.optional) {
       throw new ArgumentParseError(`Missing required argument "${arg.name}" for command "${signature.name}".`);
     }
@@ -167,7 +196,13 @@ export function parseInput(signature: ParsedSignature, argv: string[]): ParsedIn
   // Fill options with defaults.
   for (const option of signature.options) {
     if (input.options[option.name] === undefined) {
-      input.options[option.name] = option.takesValue ? (option.defaultValue ?? '') : false;
+      if (!option.takesValue) {
+        input.options[option.name] = false;
+      } else if (option.defaultValue !== undefined) {
+        input.options[option.name] = coerceValue(option.defaultValue, option.type, option.enumValues);
+      } else {
+        input.options[option.name] = '';
+      }
     }
   }
 
@@ -179,4 +214,48 @@ export class ArgumentParseError extends Error {
     super(message);
     this.name = 'ArgumentParseError';
   }
+}
+
+export type CoercionType = 'int' | 'float' | 'path' | 'glob' | 'enum';
+
+/**
+ * Turn a raw argv string into its typed value for a declared `:type`.
+ * Throws `ArgumentParseError` on invalid input so failures surface at parse
+ * time with a uniform error.
+ */
+export function coerceValue(value: string, type: CoercionType | undefined, enumValues?: string[]): string | number {
+  switch (type) {
+    case 'int': {
+      const n = Number(value);
+      if (!Number.isInteger(n)) {
+        throw new ArgumentParseError(`"${value}" is not an integer.`);
+      }
+      return n;
+    }
+    case 'float': {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        throw new ArgumentParseError(`"${value}" is not a number.`);
+      }
+      return n;
+    }
+    case 'enum': {
+      if (enumValues !== undefined && !enumValues.includes(value)) {
+        throw new ArgumentParseError(`"${value}" is not one of: ${enumValues.join(', ')}.`);
+      }
+      return value;
+    }
+    case 'path':
+      return resolvePath(value);
+    case 'glob':
+      return value;
+    default:
+      return value;
+  }
+}
+
+/** Pull allowed values out of an `enum[a,b,c]` type token. */
+function extractEnumValues(type: string): string[] | undefined {
+  const match = /^enum\[(.*)\]$/.exec(type);
+  return match ? match[1]!.split(',').map((v) => v.trim()) : undefined;
 }

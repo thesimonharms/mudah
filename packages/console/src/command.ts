@@ -63,8 +63,8 @@ export abstract class Command {
   abstract handle(): Promise<number | void> | number | void;
 
   /** A positional argument value (or its signature default). */
-  arg(name: string): string | undefined {
-    return this.input.args[name];
+  arg<T extends string | number = string>(name: string): T | undefined {
+    return this.input.args[name] as T | undefined;
   }
 
   /**
@@ -76,7 +76,7 @@ export abstract class Command {
   }
 
   /** An option value: boolean for flags, string for `--opt=value`. */
-  option<T extends string | boolean>(name: string): T | undefined {
+  option<T extends string | number | boolean = string | boolean>(name: string): T | undefined {
     return this.input.options[name] as T | undefined;
   }
 
@@ -119,4 +119,4 @@ export abstract class Command {
   }
 }
 
-export { parseInput, parseSignature, ArgumentParseError, type ParsedInput, type ParsedSignature } from './signature.js';
+export { coerceValue, parseInput, parseSignature, ArgumentParseError, type CoercionType, type ParsedInput, type ParsedSignature } from './signature.js';

@@ -11,8 +11,10 @@ export {
 export { Prompts, type PromptOptions } from './prompts.js';
 export {
   ArgumentParseError,
+  coerceValue,
   parseInput,
   parseSignature,
+  type CoercionType,
   type ParsedArg,
   type ParsedInput,
   type ParsedOption,
