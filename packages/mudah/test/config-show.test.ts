@@ -85,3 +85,44 @@ describe('config:show', () => {
     expect(s.text().err).toContain('No configuration');
   });
 });
+
+describe('config:diff', () => {
+  it('dumps the redacted config as additions without a baseline', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['config:diff'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+    const out = s.text().out;
+    expect(out).toContain('+ app.greeting = hi');
+    expect(out).toContain('[redacted]');
+    expect(out).not.toContain('s3cr3t');
+    expect(out).not.toContain('postgres://u:p@h');
+  });
+
+  it('diffs against a baseline file, redacting secrets', async () => {
+    await writeFile(
+      join(appDir, 'baseline.json'),
+      JSON.stringify({ app: { greeting: 'old', gone: 'x' } }),
+    );
+    const s = liveStreams();
+    const code = await run({
+      argv: ['config:diff', 'baseline.json'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(0);
+    const out = s.text().out;
+    expect(out).toContain('~ app.greeting: old -> hi');
+    expect(out).toContain('+ app.secret = [redacted]');
+    expect(out).toContain('- app.gone = x');
+    expect(out).toContain('+ db.url = [redacted]');
+    expect(out).not.toContain('s3cr3t');
+  });
+
+  it('emits a machine-readable diff under --json', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['config:diff', '--json'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('"added"');
+  });
+});
