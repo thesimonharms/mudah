@@ -47,6 +47,9 @@ Built this session (newly committed), modularly per package:
 - `@mudah-cli/animation` — `TaskTree` explicit dependency edges between tasks
 - `@mudah-cli/tui` — `Tabs` / `TabBar` widget (keyboard + mouse selection, scroll arrows, active-state sync)
 - `@mudah-cli/mudah` — built-in `config:show {key?}` (redacted, `--json` envelope) and `config:diff {baseline?}` (`+`/`-`/`~` flat diff vs a baseline JSON file, secrets masked)
+- `@mudah-cli/ui` — `renderLineChart(entries, {level,width,height,unicode,labels})` theme-aware line chart (sampled points + vertical connectors between differing heights)
+- `@mudah-cli/tui` — `Calendar` widget (UTC month grid, `▸`-marked cursor day, arrow/page-up/page-down/home/end + enter to select)
+- `@mudah-cli/tui` — `Checkbox` (toggle `[ ]` / `[x]`, space/enter, onSelect), `Radio` (single-select `○`/`●`, arrows + enter), `ProgressBar` (determinate display bar, 0..1, clamp + inspect())
 
 ## Feature backlog (modular, by package)
 
