@@ -126,3 +126,43 @@ describe('config:diff', () => {
     expect(s.text().out).toContain('"added"');
   });
 });
+
+describe('config:set', () => {
+  it('sets a string value and echoes it', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['config:set', 'app.greeting', 'hola'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('hola');
+  });
+
+  it('coerces numeric and boolean literals', async () => {
+    const s = liveStreams();
+    await run({ argv: ['config:set', 'app.port', '8080'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    // Numeric literal is the number 8080, JSON-encoded as "8080" (no quotes).
+    expect(s.text().out).toContain('Set app.port = 8080');
+    const t = liveStreams();
+    await run({ argv: ['config:set', 'app.live', 'true'], cwd: appDir, stdout: t.stdout, stderr: t.stderr });
+    expect(t.text().out).toContain('Set app.live = true');
+  });
+
+  it('emits a JSON envelope under --json', async () => {
+    const s = liveStreams();
+    await run({ argv: ['config:set', 'app.count', '3', '--json'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(s.text().out).toContain('"app.count"');
+  });
+});
+
+describe('config:validate', () => {
+  it('reports a healthy config when nothing is wrong', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['config:validate'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+    expect(s.text().out).toContain('healthy');
+  });
+
+  it('scopes validation to a key', async () => {
+    const s = liveStreams();
+    const code = await run({ argv: ['config:validate', 'app'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    expect(code).toBe(0);
+  });
+});

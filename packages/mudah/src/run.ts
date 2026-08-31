@@ -19,6 +19,8 @@ import BuildCommand from './commands/build.command.js';
 import DoctorCommand from './commands/doctor.command.js';
 import ConfigShowCommand from './commands/config.show.command.js';
 import ConfigDiffCommand from './commands/config.diff.command.js';
+import ConfigSetCommand from './commands/config.set.command.js';
+import ConfigValidateCommand from './commands/config.validate.command.js';
 import DevCommand from './commands/dev.command.js';
 
 export interface RunOptions {
@@ -377,6 +379,8 @@ function registerBuiltIns(kernel: ConsoleKernel): void {
   kernel.register({ default: DoctorCommand });
   kernel.register({ default: ConfigShowCommand });
   kernel.register({ default: ConfigDiffCommand });
+  kernel.register({ default: ConfigSetCommand });
+  kernel.register({ default: ConfigValidateCommand });
   kernel.register({
     default: class extends DevCommand {
       constructor() {
