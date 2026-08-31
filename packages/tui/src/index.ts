@@ -16,6 +16,7 @@ export {
   Radio,
   Table,
   Tabs,
+  TextArea,
   TextInput,
   Viewport,
   type BreadcrumbItem,
