@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { s } from '@mudah-cli/config';
 import { parseKeys } from '@mudah-cli/terminal';
 import {
+  Breadcrumb,
+  type BreadcrumbItem,
   Calendar,
   Checkbox,
   Column,
@@ -306,5 +308,42 @@ describe('ProgressBar', () => {
 
   it('is not focusable', () => {
     expect(new ProgressBar().focusable).toBe(false);
+  });
+});
+
+describe('Breadcrumb', () => {
+  it('renders a path of crumbs', () => {
+    const b = new Breadcrumb([{ label: 'home' }, { label: 'settings' }]);
+    expect(b.render()).toEqual(['home / settings']);
+  });
+
+  it('moves the selection with arrows', () => {
+    const b = new Breadcrumb([
+      { label: 'home' },
+      { label: 'users' },
+      { label: 'alice' },
+    ]);
+    b.onKey({ name: 'right' });
+    expect(b.selectedIndex).toBe(1);
+    b.onKey({ name: 'right' });
+    b.onKey({ name: 'right' });
+    expect(b.selectedIndex).toBe(2);
+    b.onKey({ name: 'left' });
+    expect(b.selectedIndex).toBe(1);
+  });
+
+  it('fires onSelect on enter', () => {
+    let picked: BreadcrumbItem | undefined;
+    const b = new Breadcrumb(
+      [{ label: 'home' }, { label: 'edit' }],
+      { onSelect: (item) => (picked = item) },
+    );
+    b.onKey({ name: 'right' });
+    b.onKey({ name: 'enter' });
+    expect(picked?.label).toBe('edit');
+  });
+
+  it('is focusable', () => {
+    expect(new Breadcrumb([]).focusable).toBe(true);
   });
 });

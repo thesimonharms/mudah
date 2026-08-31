@@ -976,3 +976,79 @@ export class ProgressBar extends BaseComponent {
   }
 }
 
+export interface BreadcrumbItem {
+  label: string;
+  value?: unknown;
+}
+
+export interface BreadcrumbOptions {
+  onSelect?: (item: BreadcrumbItem, index: number) => void;
+}
+
+/** A focusable breadcrumb path. Arrows move between crumbs, enter selects. */
+export class Breadcrumb extends BaseComponent {
+  selectedIndex = 0;
+
+  readonly focusable = true;
+  readonly keys = { left: 'prev', right: 'next', home: 'first', end: 'last', enter: 'select' };
+
+  constructor(
+    private readonly crumbs: BreadcrumbItem[],
+    private readonly options: BreadcrumbOptions = {},
+  ) {
+    super();
+  }
+
+  private clamp(i: number): number {
+    return Math.min(Math.max(i, 0), Math.max(0, this.crumbs.length - 1));
+  }
+
+  move(delta: number): void {
+    this.selectedIndex = this.clamp(this.selectedIndex + delta);
+  }
+
+  confirm(): void {
+    const item = this.crumbs[this.selectedIndex];
+    if (item) this.options.onSelect?.(item, this.selectedIndex);
+  }
+
+  render(): string[] {
+    return [this.crumbs.map((c) => c.label).join(' / ')];
+  }
+
+  measure(_width: number, _height: number): { width: number; height: number } {
+    const line = this.render()[0] ?? '';
+    return { width: visibleLength(line), height: 1 };
+  }
+
+  override onKey(event: KeyEvent): boolean {
+    switch (event.name) {
+      case 'left':
+        this.move(-1);
+        return true;
+      case 'right':
+        this.move(1);
+        return true;
+      case 'home':
+        this.selectedIndex = 0;
+        return true;
+      case 'end':
+        this.selectedIndex = this.clamp(this.crumbs.length - 1);
+        return true;
+      case 'enter':
+        this.confirm();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  inspect(): { role: string; name?: string; value?: unknown } {
+    return {
+      role: 'breadcrumb',
+      name: this.crumbs[this.selectedIndex]?.label,
+      value: this.crumbs[this.selectedIndex],
+    };
+  }
+}
+

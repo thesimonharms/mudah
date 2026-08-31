@@ -5,6 +5,7 @@ export { dumpTree, type TreeNode } from './dump.js';
 export { keys, formatKeys } from './keymap.js';
 export { BaseComponent, type Component } from './component.js';
 export {
+  Breadcrumb,
   Calendar,
   Checkbox,
   Label,
@@ -17,6 +18,7 @@ export {
   Tabs,
   TextInput,
   Viewport,
+  type BreadcrumbItem,
   type TableColumnDef,
 } from './widgets.js';
 export {
