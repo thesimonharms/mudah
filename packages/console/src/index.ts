@@ -20,3 +20,4 @@ export {
   type ParsedOption,
   type ParsedSignature,
 } from './signature.js';
+export { suggestCommand, fuzzyRank, editDistance } from './fuzzy-match.js';

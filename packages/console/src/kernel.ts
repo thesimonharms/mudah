@@ -5,6 +5,7 @@ import {
   ArgumentParseError,
   parseInput,
   parseSignature,
+  suggestCommand,
   type ParsedInput,
   type ParsedSignature,
 } from './command.js';
@@ -189,9 +190,9 @@ export class ConsoleKernel {
 
     const entry = this.get(name);
     if (!entry) {
-      throw new UsageError(`Unknown command "${name}".`, {
-        hint: 'Run with --help to see available commands.',
-      });
+      const suggestion = suggestCommand(name, [...this.commands.keys(), ...this.aliases.keys()]);
+      const hint = suggestion ? `Did you mean "${suggestion}"?` : 'Run with --help to see available commands.';
+      throw new UsageError(`Unknown command "${name}".`, { hint });
     }
 
     if (entry.deprecated) {

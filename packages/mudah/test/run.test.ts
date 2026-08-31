@@ -168,6 +168,19 @@ describe('run()', () => {
     expect(s.text().err).toContain('Hint:');
   });
 
+  it('suggests a close command for a typo', async () => {
+    const s = liveStreams();
+    const code = await run({
+      argv: ['db-statu', '--json'],
+      cwd: appDir,
+      stdout: s.stdout,
+      stderr: s.stderr,
+    });
+    expect(code).toBe(2);
+    const parsed = JSON.parse(s.text().out.trim()) as { error?: { hint?: string } };
+    expect(parsed.error?.hint).toContain('Did you mean "db:status"');
+  });
+
   it('returns 1 with a friendly message when the manifest is missing', async () => {
     const s = liveStreams();
     const code = await run({ argv: ['hello'], cwd: '/nonexistent-app', stdout: s.stdout, stderr: s.stderr });

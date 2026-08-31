@@ -120,3 +120,4 @@ export abstract class Command {
 }
 
 export { coerceValue, parseInput, parseSignature, ArgumentParseError, type CoercionType, type ParsedInput, type ParsedSignature } from './signature.js';
+export { suggestCommand, fuzzyRank, editDistance } from './fuzzy-match.js';
