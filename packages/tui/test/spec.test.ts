@@ -3,12 +3,14 @@ import { s } from '@mudah-cli/config';
 import { parseKeys } from '@mudah-cli/terminal';
 import {
   Calendar,
+  Checkbox,
   Column,
   Form,
   FuzzyList,
   Label,
   List,
   Overlay,
+  Radio,
   Screen,
   Sparkline,
   Stack,
@@ -239,5 +241,46 @@ describe('Calendar', () => {
     expect(day(cal.selected)).toBe(15);
     expect(picked && day(picked)).toBe(15);
     expect(picked && yearMonth(picked)).toEqual([2024, 0]);
+  });
+});
+
+describe('Checkbox', () => {
+  it('toggles on space and reports the value', () => {
+    let picked: boolean | undefined;
+    const cb = new Checkbox({ label: 'dry', onSelect: (v) => (picked = v) });
+    expect(cb.render()).toEqual(['[ ] dry']);
+    cb.onKey({ name: 'space' });
+    expect(cb.checked).toBe(true);
+    expect(picked).toBe(true);
+    expect(cb.render()).toEqual(['[x] dry']);
+    cb.onKey({ name: 'space' });
+    expect(cb.checked).toBe(false);
+  });
+
+  it('toggles on enter too', () => {
+    const cb = new Checkbox();
+    cb.onKey({ name: 'enter' });
+    expect(cb.checked).toBe(true);
+  });
+});
+
+describe('Radio', () => {
+  it('moves and selects a row', () => {
+    let picked: string | number | undefined;
+    const radio = new Radio(
+      [
+        { label: 'a', value: 'A' },
+        { label: 'b', value: 'B' },
+      ],
+      (v) => {
+        picked = v;
+      },
+    );
+    expect(radio.render()).toEqual(['● a', '○ b']);
+    radio.onKey({ name: 'down' });
+    expect(radio.selectedIndex).toBe(1);
+    expect(radio.render()).toEqual(['○ a', '● b']);
+    radio.onKey({ name: 'enter' });
+    expect(picked).toBe('B');
   });
 });

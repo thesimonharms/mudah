@@ -6,10 +6,12 @@ export { keys, formatKeys } from './keymap.js';
 export { BaseComponent, type Component } from './component.js';
 export {
   Calendar,
+  Checkbox,
   Label,
   List,
   MultiList,
   Panel,
+  Radio,
   Table,
   Tabs,
   TextInput,
