@@ -15,6 +15,7 @@ jobs:
         with:
           node-version: 26
       - uses: oven-sh/setup-bun@v2
+      - run: sudo apt-get update && sudo apt-get install -y imagemagick
       - run: bun install --frozen-lockfile
       # bench spawns a real `node` process that resolves @mudah-cli/* to dist via
       # exports, so the dist must exist before the cold-start budget is measured.

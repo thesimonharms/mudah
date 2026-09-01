@@ -175,9 +175,12 @@ export class HeifDriver implements ImageDriver {
 /** ImageMagick: gif encode + a broad fallback for anything else. */
 export class MagickDriver implements ImageDriver {
   readonly name = 'magick';
+  private bin = 'magick';
 
   async probe(): Promise<DriverCapabilities> {
-    if (!(await commandExists('magick'))) return { decode: [], encode: [] };
+    if (await commandExists('magick')) this.bin = 'magick';
+    else if (await commandExists('convert')) this.bin = 'convert';
+    else return { decode: [], encode: [] };
     return {
       decode: ['png', 'jpeg', 'webp', 'gif'],
       encode: ['png', 'jpeg', 'webp', 'gif'],
@@ -186,10 +189,10 @@ export class MagickDriver implements ImageDriver {
 
   async convert(from: ImageFormat, to: ImageFormat, bytes: Uint8Array, options: ConvertOptions): Promise<Uint8Array> {
     void from;
-    // ImageMagick reads/writes images on stdio via the bare `magick` command:
+    // ImageMagick reads/writes images on stdio via `magick` (IM7) or `convert` (IM6):
     //   magick <input>[-] [-quality N] <output>[-]
     return runTool(
-      ['magick', '-', '-quality', String(options.quality ?? 80), `${to === 'jpeg' ? 'jpg' : to}:-`],
+      [this.bin, '-', '-quality', String(options.quality ?? 80), `${to === 'jpeg' ? 'jpg' : to}:-`],
       bytes,
     );
   }
