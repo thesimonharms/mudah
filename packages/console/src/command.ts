@@ -39,6 +39,16 @@ export abstract class Command {
   /** When set, the command is deprecated; a string is the deprecation reason. */
   deprecated?: boolean | string;
 
+  /**
+   * Documented non-zero exit codes. Keys are numeric codes, values are
+   * short descriptions. Rendered in `--help` output for each command.
+   *
+   * ```ts
+   * static exitCodes = { 1: 'validation failed', 2: 'network error' };
+   * ```
+   */
+  static exitCodes?: Record<number, string>;
+
   /** The application (container, config, events). */
   app!: Application;
   /** Styled output for the user. */

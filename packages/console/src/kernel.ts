@@ -28,6 +28,8 @@ export interface CommandEntry {
   aliases?: string[];
   /** When set, the command is deprecated; a string is the deprecation reason. */
   deprecated?: boolean | string;
+  /** Documented non-zero exit codes (code → description). */
+  exitCodes?: Record<number, string>;
 }
 
 /** A group of commands sharing a namespace. */
@@ -138,6 +140,8 @@ export class ConsoleKernel {
     }
     entry.aliases = aliasList;
     entry.deprecated = instance.deprecated;
+    const exitCodesStatic = (Ctor as { exitCodes?: Record<number, string> }).exitCodes;
+    if (exitCodesStatic) entry.exitCodes = exitCodesStatic;
     this.commands.set(signature.name, entry);
     return this;
   }

@@ -95,6 +95,13 @@ export function renderCommandHelp(appName: string, entry: CommandEntry, lines: s
     lines.push('Aliases:');
     lines.push(`  ${entry.aliases.join(', ')}`, '');
   }
+  if (entry.exitCodes && Object.keys(entry.exitCodes).length > 0) {
+    lines.push('Exit codes:');
+    for (const [code, desc] of Object.entries(entry.exitCodes)) {
+      lines.push(`  ${code}  ${desc}`);
+    }
+    lines.push('');
+  }
   if (entry.signature.args.length > 0) {
     lines.push('Arguments:');
     const width = Math.max(...entry.signature.args.map((a) => a.name.length)) + 2;

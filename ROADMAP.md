@@ -99,7 +99,7 @@ Built this session (newly committed), modularly per package:
 ### `@mudah-cli/core`
 - `--timeout` / `--memory` guards per command (auto-abort, exit 137/124) ✅
 - Command input/output stream redirection API
-- Exit-code registry (`Command.exitMap`) for documented non-zero codes
+- Exit-code registry (`Command.exitCodes`) for documented non-zero codes ✅
 - Event bus: `app.on('booted')`, `app.on('shutdown')`, `app.on('config.changed')` ✅
 - Plugin dependency graph resolution at boot
 - Async `evaluateLazy()` predicate provider gating
