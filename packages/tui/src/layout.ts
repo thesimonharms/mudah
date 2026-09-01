@@ -74,7 +74,7 @@ export abstract class Layout extends BaseComponent {
   protected bounds: ChildBounds[] = [];
   private focusIndex = -1;
 
-  readonly focusable = false;
+  readonly focusable: boolean = false;
 
   inspect(): { role: string; name?: string; value?: unknown } {
     return { role: this.constructor.name };
