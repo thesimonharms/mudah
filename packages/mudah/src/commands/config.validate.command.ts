@@ -1,29 +1,21 @@
 import { Command } from '@mudah-cli/console';
-import { validateSchema, type Schema } from '@mudah-cli/config';
+import { schemaAt, validateSchema, type Schema } from '@mudah-cli/config';
 
 /**
  * Built-in `config:validate {key?}` command.
  *
- * Walks the (current) config tree and reports every offending key, just like
- * the schema's boot-time validation. Optional `{schema?}` makes the user paste
- * in a JSON schema; the command only supports a tiny shape (object → s.object)
- * inline so it doesn't need a full provider.
+ * When a schema is bound on `app.config()`, this runs `validateSchema` and
+ * reports every offending key. Without a schema the command falls back to a
+ * shallow walk that flags `undefined` values.
  */
 export default class ConfigValidateCommand extends Command {
   signature = 'config:validate {key?}';
-  description = 'Run a shallow schema check against the (current) config tree';
+  description = 'Run a schema check against the (current) config tree';
 
   async handle() {
     const cfg = this.app.config();
-    const root = cfg.all();
     const key = this.arg('key');
-    const target = key ? cfg.get(key) : root;
-
-    // Without a schema definition the command can still check types of
-    // well-known config keys (numbers, booleans). This is a best-effort
-    // smoke test — full validation requires the user's schema at boot.
-    const issues: Array<{ path: string; message: string }> = [];
-    walk(valueFor(target), '', issues);
+    const issues = collectIssues(cfg.schema, cfg.all(), key, (k) => cfg.get(k));
 
     if (this.output.isMachineReadable) {
       this.output.emit('data', 'config', { ok: issues.length === 0, issues });
@@ -39,6 +31,27 @@ export default class ConfigValidateCommand extends Command {
   }
 }
 
+function collectIssues(
+  schema: Schema<unknown> | undefined,
+  root: Record<string, unknown>,
+  key: string | undefined,
+  get: (key: string) => unknown,
+): Array<{ path: string; message: string }> {
+  if (schema !== undefined) {
+    if (key) {
+      const node = schemaAt(schema, key);
+      if (node === undefined) return [{ path: key, message: 'is not a known key' }];
+      return [...validateSchema(node, get(key), key).issues];
+    }
+    return [...validateSchema(schema, root).issues];
+  }
+
+  const issues: Array<{ path: string; message: string }> = [];
+  const target = key ? get(key) : root;
+  walk(valueFor(target), key ?? '', issues);
+  return issues;
+}
+
 function valueFor(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 }
@@ -52,7 +65,3 @@ function walk(value: unknown, prefix: string, issues: Array<{ path: string; mess
     walk(v, path, issues);
   }
 }
-
-// Re-exported only to anchor the type at compile time.
-export type _Schema = Schema<unknown>;
-void validateSchema;

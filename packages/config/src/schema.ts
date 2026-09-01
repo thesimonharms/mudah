@@ -412,6 +412,23 @@ export const s = {
   },
 };
 
+/**
+ * Walk an object schema along a dotted path (`app.port`). Returns the node
+ * at that path, or `undefined` when a segment is missing or not an object.
+ */
+export function schemaAt(schema: Schema<unknown>, path: string): Schema<unknown> | undefined {
+  if (path === '') return schema;
+  let current: Schema<unknown> | undefined = schema;
+  for (const part of path.split('.')) {
+    if (current === undefined || current.type !== 'object' || !('shape' in current)) {
+      return undefined;
+    }
+    const shape = (current as { readonly shape: Record<string, Schema<unknown>> }).shape;
+    current = shape[part];
+  }
+  return current;
+}
+
 /** Validate `value` against `schema`. Collects every issue; never throws. */
 export function validateSchema<T>(
   schema: Schema<T>,

@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConfigRepository, defineConfig, env, loadConfigFiles, loadEnvFile } from '@mudah-cli/config';
+import {
+  ConfigRepository,
+  defineConfig,
+  env,
+  formatPrecedence,
+  loadConfigFiles,
+  loadEnvFile,
+} from '@mudah-cli/config';
 
 describe('ConfigRepository', () => {
   it('reads and writes dotted keys through nested structure', () => {
@@ -43,6 +50,55 @@ describe('ConfigRepository', () => {
     config.set('x', [1, 2]);
     expect(config.all()).toEqual({ x: [1, 2] });
   });
+
+  it('records provenance per dotted key and layer', () => {
+    const config = new ConfigRepository();
+    config.merge('app', { name: 'default', port: 3000 }, 'default');
+    config.set('app.name', 'mudah', 'file');
+    config.set('app.env', 'prod', 'env');
+
+    expect(config.source('app.name')).toEqual({ layer: 'file', value: 'mudah' });
+    expect(config.source('app.port')).toEqual({ layer: 'default', value: 3000 });
+    expect(config.source('app.env')).toEqual({ layer: 'env', value: 'prod' });
+    expect(config.source('missing')).toBeUndefined();
+
+    const rows = config.precedence();
+    expect(rows).toEqual([
+      { key: 'app.env', layer: 'env', value: 'prod' },
+      { key: 'app.name', layer: 'file', value: 'mudah' },
+      { key: 'app.port', layer: 'default', value: 3000 },
+    ]);
+    expect(formatPrecedence(rows)).toEqual([
+      'app.env  env  prod',
+      'app.name  file  mudah',
+      'app.port  default  3000',
+    ]);
+  });
+
+  it('set() defaults to the runtime layer', () => {
+    const config = new ConfigRepository();
+    config.set('flag', true);
+    expect(config.source('flag')).toEqual({ layer: 'runtime', value: true });
+  });
+
+  it('merge() keeps existing values and their layers', () => {
+    const config = new ConfigRepository();
+    config.set('app.name', 'mine', 'flag');
+    config.merge('app', { name: 'default', port: 3000 }, 'default');
+    expect(config.get('app.name')).toBe('mine');
+    expect(config.source('app.name')).toEqual({ layer: 'flag', value: 'mine' });
+    expect(config.source('app.port')).toEqual({ layer: 'default', value: 3000 });
+  });
+
+  it('delete() drops provenance for the key and its children', () => {
+    const config = new ConfigRepository();
+    config.set('app.name', 'x', 'file');
+    config.set('app.port', 1, 'file');
+    expect(config.delete('app')).toBe(true);
+    expect(config.source('app.name')).toBeUndefined();
+    expect(config.precedence()).toEqual([]);
+  });
+
 });
 
 describe('env()', () => {

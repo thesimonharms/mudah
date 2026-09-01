@@ -20,6 +20,7 @@ import DoctorCommand from './commands/doctor.command.js';
 import ConfigShowCommand from './commands/config.show.command.js';
 import ConfigDiffCommand from './commands/config.diff.command.js';
 import ConfigSetCommand from './commands/config.set.command.js';
+import ConfigSourceCommand from './commands/config.source.command.js';
 import ConfigValidateCommand from './commands/config.validate.command.js';
 import DevCommand from './commands/dev.command.js';
 import InfoCommand from './commands/info.command.js';
@@ -468,6 +469,7 @@ function registerBuiltIns(kernel: ConsoleKernel): void {
   kernel.register({ default: ConfigDiffCommand });
   kernel.register({ default: InfoCommand });
   kernel.register({ default: ConfigSetCommand });
+  kernel.register({ default: ConfigSourceCommand });
   kernel.register({ default: ConfigValidateCommand });
   kernel.register({
     default: class extends DevCommand {
