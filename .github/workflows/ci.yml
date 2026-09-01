@@ -20,7 +20,8 @@ jobs:
       # exports, so the dist must exist before the cold-start budget is measured.
       - run: npm run build
       - run: npm run typecheck
-      # Vitest via npm runs under Node, so Bun.Image is undefined and convert-img
-      # cannot encode. `bun run test` keeps the same suite with the Bun runtime.
+      # Vitest via `npm run test` runs under Node, so Bun.Image is undefined
+      # and convert-img cannot encode. `bun run test` keeps the same suite
+      # with the Bun runtime (Bun.Image for png/jpeg/webp).
       - run: bun run test
       - run: npm run bench -- --check
