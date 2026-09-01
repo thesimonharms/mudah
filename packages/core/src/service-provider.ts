@@ -21,6 +21,18 @@ export abstract class ServiceProvider {
   boot(): void | Promise<void> {}
 
   /**
+   * Called when the application is shutting down.
+   * Use this to release resources (close DB connections, stop timers, etc.).
+   */
+  onShutdown(): void | Promise<void> {}
+
+  /**
+   * Called when a config value is mutated.
+   * @param key The dotted key that changed.
+   */
+  onConfigChanged(key: string): void | Promise<void> {}
+
+  /**
    * Import a config file and merge it as defaults under `key`
    * (existing values win).
    */

@@ -103,6 +103,7 @@ Built this session (newly committed), modularly per package:
 - Event bus: `app.on('booted')`, `app.on('shutdown')`, `app.on('config.changed')` ✅
 - Plugin dependency graph resolution at boot
 - Async `evaluateLazy()` predicate provider gating
+- Provider lifecycle hooks: `onShutdown()`, `onConfigChanged()` ✅
 
 ### `@mudah-cli/console`
 - Tab completion for commands, args, and options

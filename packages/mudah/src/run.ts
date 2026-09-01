@@ -22,6 +22,7 @@ import ConfigDiffCommand from './commands/config.diff.command.js';
 import ConfigSetCommand from './commands/config.set.command.js';
 import ConfigValidateCommand from './commands/config.validate.command.js';
 import DevCommand from './commands/dev.command.js';
+import InfoCommand from './commands/info.command.js';
 
 /** Parsed timeout in milliseconds. */
 function parseTimeout(value: string): number {
@@ -376,7 +377,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     return code;
   } finally {
     cleanupMonitors();
-    await app.events().emit('app.shutdown', { app });
+    await app.shutdown();
   }
 }
 
@@ -465,6 +466,7 @@ function registerBuiltIns(kernel: ConsoleKernel): void {
   kernel.register({ default: DoctorCommand });
   kernel.register({ default: ConfigShowCommand });
   kernel.register({ default: ConfigDiffCommand });
+  kernel.register({ default: InfoCommand });
   kernel.register({ default: ConfigSetCommand });
   kernel.register({ default: ConfigValidateCommand });
   kernel.register({

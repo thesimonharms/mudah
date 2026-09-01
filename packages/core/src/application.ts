@@ -86,6 +86,7 @@ export class Application extends Container {
   private readonly providers: ProviderClass[] = [];
   private readonly lazyProviders: LazyRegistration[] = [];
   private readonly bootedLazy = new Set<ProviderClass>();
+  private readonly bootedInstances: ServiceProvider[] = [];
   private booted = false;
 
   constructor(basePath: string = process.cwd(), manifest?: MudahManifest) {
@@ -140,6 +141,7 @@ export class Application extends Container {
 
     for (const Provider of this.providers) {
       const provider = new Provider(this);
+      this.bootedInstances.push(provider);
       const t0 = profile ? performance.now() : 0;
       await provider.register?.();
       if (profile) {
@@ -147,7 +149,10 @@ export class Application extends Container {
       }
     }
     for (const Provider of this.providers) {
-      const provider = new Provider(this);
+      const provider = this.bootedInstances.find(
+        (p) => p.constructor === Provider,
+      );
+      if (!provider) continue;
       const t0 = profile ? performance.now() : 0;
       await provider.boot?.();
       if (profile) {
@@ -158,6 +163,7 @@ export class Application extends Container {
     this.booted = true;
     await this.events().emit('app.booted', { app: this });
     this.config().onChangeNotification((key) => {
+      this.notifyConfigChanged(key);
       void this.events().emit('config.changed', { key });
     });
 
@@ -211,8 +217,24 @@ export class Application extends Container {
     if (this.bootedLazy.has(provider)) return;
     this.bootedLazy.add(provider);
     const instance = new provider(this);
+    this.bootedInstances.push(instance);
     await instance.register?.();
     await instance.boot?.();
+  }
+
+  /** Notify providers that a config value was mutated. */
+  notifyConfigChanged(key: string): void {
+    for (const p of this.bootedInstances) {
+      void p.onConfigChanged?.(key);
+    }
+  }
+
+  /** Shut down all booted providers, then emit 'app.shutdown'. */
+  async shutdown(): Promise<void> {
+    for (const p of this.bootedInstances) {
+      await p.onShutdown?.();
+    }
+    await this.events().emit('app.shutdown', { app: this });
   }
 
   /**
