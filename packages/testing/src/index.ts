@@ -15,3 +15,4 @@ export {
   type MockPlugin,
   type MockPluginOptions,
 } from './plugin-mock.js';
+export { SessionRecorder, type ReplayHandle, type SessionAction } from '@mudah-cli/tui';

@@ -85,16 +85,18 @@ export function detectCapabilities(options: DetectCapabilitiesOptions = {}): Ter
 
   const brand = detectBrand(env);
   const colorLevel = sniffPalette({ env, isTty });
+  const headless = env['MUDAH_HEADLESS'] === '1' || env['MUDAH_HEADLESS'] === 'true';
   const reducedMotion =
-    overrides.reducedMotion ?? (env['MUDAH_REDUCED_MOTION'] === '1' || env['NO_ANIMATION'] === '1');
+    overrides.reducedMotion ??
+    (headless || env['MUDAH_REDUCED_MOTION'] === '1' || env['NO_ANIMATION'] === '1');
 
   return {
-    isTty,
+    isTty: headless ? false : isTty,
     color: overrides.color ?? colorLevel > 0,
     colorLevel,
     trueColor: colorLevel === 24,
     unicode: overrides.unicode ?? env['TERM'] !== 'dumb',
-    animations: isTty && !reducedMotion && env['CI'] !== 'true' && env['CI'] !== '1',
+    animations: isTty && !headless && !reducedMotion && env['CI'] !== 'true' && env['CI'] !== '1',
     reducedMotion,
     osc9: brand === 'ghostty' || brand === 'wezterm',
     osc133:

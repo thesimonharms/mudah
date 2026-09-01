@@ -271,4 +271,55 @@ describe('EventBus', () => {
     await bus.emit('app.booted', { app: freshApp() });
     expect(seen).toEqual(['two']);
   });
+
+  it('trace() logs every emit', async () => {
+    const bus = new EventBus();
+    const traced: string[] = [];
+    bus.trace((event) => {
+      traced.push(event);
+    });
+    await bus.emit('config.changed', { key: 'app.name' });
+    expect(traced).toEqual(['config.changed']);
+  });
+});
+
+describe('Application remaining APIs', () => {
+  it('awaits an async bootWhen predicate', async () => {
+    class AsyncFlag extends ServiceProvider {
+      static booted = false;
+      register(): void {
+        AsyncFlag.booted = true;
+      }
+    }
+    const app = freshApp();
+    app.registerLazy(AsyncFlag, {
+      bootWhen: async (a) => {
+        await Promise.resolve();
+        return a.config().get<boolean>('ok', false) === true;
+      },
+    });
+    await app.evaluateLazy();
+    expect(AsyncFlag.booted).toBe(false);
+    app.config().set('ok', true);
+    await app.evaluateLazy();
+    expect(AsyncFlag.booted).toBe(true);
+  });
+
+  it('redirects streams and reports provider health', async () => {
+    class Healthy extends ServiceProvider {
+      health() {
+        return { status: 'ok' as const, detail: 'ready' };
+      }
+    }
+    const app = freshApp();
+    const chunks: string[] = [];
+    app.redirect({ stdout: { write: (data) => chunks.push(data) } });
+    app.register(Healthy);
+    await app.boot();
+    expect(app.streams().stdout).toBeDefined();
+    const report = await app.health();
+    expect(report[0]?.provider).toBe('Healthy');
+    expect(report[0]?.status).toBe('ok');
+    expect(report[0]?.detail).toBe('ready');
+  });
 });

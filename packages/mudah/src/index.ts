@@ -1,5 +1,7 @@
 export { run, type RunOptions } from './run.js';
-export { createWatcher, type WatcherOptions } from './watcher.js';
+export { createWatcher, watchPlugins, type WatcherOptions } from './watcher.js';
+export { handleLspMessage, initializeResult, completionItems, type LspMessage } from './lsp.js';
+export { normalizeAutocompleteShell, renderAutocompleteScript, type AutocompleteShell } from './autocomplete.js';
 
 // App-facing re-exports: `import { Command } from '@mudah-cli/mudah'` is all users need.
 export { Command } from '@mudah-cli/console';
@@ -10,21 +12,34 @@ export {
   UsageError,
   ExitError,
   CommandCancelled,
+  addMessages,
   checkForUpdate,
   clearUpdateCache,
   compareSemVer,
+  createTelemetry,
+  defaultCacheDir,
+  defaultMigrationTable,
   discoverPlugins,
   findPluginPackages,
+  formatGraph,
   formatUpdateNudge,
+  gatePlugin,
   loadManifest,
   loadPlugin,
+  MigrationRunner,
   parseSemVer,
+  pluginGraph,
+  setLocale,
+  t,
   type MudahManifest,
   type LazyProviderOptions,
+  type Migration,
   type PluginDiscoveryOptions,
   type PluginInfo,
   type ProviderClass,
   type AppEvents,
+  type Telemetry,
+  type TelemetrySink,
   type UpdateCheckOptions,
   type UpdateCheckResult,
 } from '@mudah-cli/core';

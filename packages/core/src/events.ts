@@ -18,6 +18,7 @@ export type EventHandler<E> = (payload: E) => void | Promise<void>;
  */
 export class EventBus {
   private readonly listeners = new Map<keyof AppEvents, Set<EventHandler<never>>>();
+  private tracer?: (event: string, payload: unknown) => void;
 
   /** Subscribe. Returns an unsubscribe function. */
   on<K extends keyof AppEvents>(event: K, handler: EventHandler<AppEvents[K]>): () => void {
@@ -34,8 +35,20 @@ export class EventBus {
     this.listeners.get(event)?.delete(handler as EventHandler<never>);
   }
 
+  /**
+   * Log every dispatch. Pass `true` to write to stderr, or a custom sink.
+   * Used by `--trace`.
+   */
+  trace(enabled: boolean | ((event: string, payload: unknown) => void)): this {
+    if (enabled === false) this.tracer = undefined;
+    else if (enabled === true) this.tracer = (event, payload) => console.error(`[trace] ${event}`, payload);
+    else this.tracer = enabled;
+    return this;
+  }
+
   /** Emit to all subscribers, awaiting each in order. */
   async emit<K extends keyof AppEvents>(event: K, payload: AppEvents[K]): Promise<void> {
+    this.tracer?.(event, payload);
     const set = this.listeners.get(event);
     if (!set) return;
     for (const handler of [...set]) {

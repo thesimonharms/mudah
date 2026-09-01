@@ -27,6 +27,14 @@ export interface PluginInfo {
   readonly providers: readonly ProviderClass[];
   /** Command modules found in the package. */
   readonly commands: readonly CommandModule[];
+  /** Other plugin names this plugin must boot after. */
+  readonly depends?: readonly string[];
+  /** Declared peer range (e.g. `@mudah-cli/core`: `^0.8.0`) for compatibility gates. */
+  readonly peers?: Readonly<Record<string, string>>;
+  /** Runtime feature flags the host must satisfy. */
+  readonly features?: readonly string[];
+  /** When set, the plugin is deprecated (string is the reason). */
+  readonly deprecated?: boolean | string;
 }
 
 export interface PluginDiscoveryOptions {
@@ -47,6 +55,10 @@ export interface PluginDiscoveryOptions {
   readPackage?: (path: string) => Promise<unknown>;
   /** Import a resolved module URL. Injectable for tests. */
   importModule?: (url: string) => Promise<Record<string, unknown>>;
+  /** Host `@mudah-cli/core` version used by compatibility gates. */
+  coreVersion?: string;
+  /** Runtime feature flags the host currently provides. */
+  features?: readonly string[];
 }
 
 interface PackageJson {
@@ -218,7 +230,118 @@ export async function loadPlugin(
     commands.push({ default: mod.default });
   }
 
-  return { name, providers, commands };
+  const depends = Array.isArray(mod.depends) ? mod.depends.filter((v): v is string => typeof v === 'string') : [];
+  const peers =
+    mod.peers && typeof mod.peers === 'object' && !Array.isArray(mod.peers)
+      ? (mod.peers as Record<string, string>)
+      : {};
+  const features = Array.isArray(mod.features) ? mod.features.filter((v): v is string => typeof v === 'string') : [];
+  const deprecated =
+    typeof mod.deprecated === 'string' || mod.deprecated === true ? (mod.deprecated as boolean | string) : undefined;
+
+  return { name, providers, commands, depends, peers, features, deprecated };
+}
+
+/**
+ * Topological sort of plugins by `depends`. Unknown edges are ignored.
+ * Cycles fall back to original order for the remaining nodes.
+ */
+export function sortPluginsByDependency(plugins: readonly PluginInfo[]): PluginInfo[] {
+  const byName = new Map(plugins.map((plugin) => [plugin.name, plugin]));
+  const incoming = new Map<string, number>();
+  const edges = new Map<string, string[]>();
+  for (const plugin of plugins) {
+    incoming.set(plugin.name, incoming.get(plugin.name) ?? 0);
+    for (const dep of plugin.depends ?? []) {
+      if (!byName.has(dep)) continue;
+      edges.set(dep, [...(edges.get(dep) ?? []), plugin.name]);
+      incoming.set(plugin.name, (incoming.get(plugin.name) ?? 0) + 1);
+    }
+  }
+  const queue = [...incoming.entries()].filter(([, n]) => n === 0).map(([name]) => name);
+  const ordered: PluginInfo[] = [];
+  while (queue.length > 0) {
+    const name = queue.shift()!;
+    const plugin = byName.get(name);
+    if (plugin) ordered.push(plugin);
+    for (const next of edges.get(name) ?? []) {
+      const left = (incoming.get(next) ?? 1) - 1;
+      incoming.set(next, left);
+      if (left === 0) queue.push(next);
+    }
+  }
+  if (ordered.length === plugins.length) return ordered;
+  const seen = new Set(ordered.map((p) => p.name));
+  return [...ordered, ...plugins.filter((p) => !seen.has(p.name))];
+}
+
+/** Semver-lite: `^1.2.3` / `>=1.0.0` / `1.2.3` satisfied by `actual`. */
+export function satisfiesPeerRange(actual: string, range: string): boolean {
+  const clean = actual.replace(/^v/, '');
+  const [maj = 0, min = 0, pat = 0] = clean.split('.').map((p) => Number.parseInt(p, 10) || 0);
+  const value = maj * 1_000_000 + min * 1_000 + pat;
+  const match = /^(>=|>|\^|~|=)?\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(range.trim());
+  if (!match) return true;
+  const op = match[1] ?? '=';
+  const rMaj = Number(match[2]);
+  const rMin = Number(match[3] ?? 0);
+  const rPat = Number(match[4] ?? 0);
+  const required = rMaj * 1_000_000 + rMin * 1_000 + rPat;
+  if (op === '>') return value > required;
+  if (op === '>=') return value >= required;
+  if (op === '^') return maj === rMaj && value >= required;
+  if (op === '~') return maj === rMaj && min === rMin && value >= required;
+  return value === required;
+}
+
+/** Host core version used by compatibility gates. */
+export const CORE_VERSION: string = (() => {
+  try {
+    const pkg = createRequire(import.meta.url)('../package.json') as { version?: string };
+    return typeof pkg.version === 'string' ? pkg.version : '0.8.0';
+  } catch {
+    return '0.8.0';
+  }
+})();
+
+export interface PluginGateContext {
+  /** Installed `@mudah-cli/core` version. */
+  coreVersion: string;
+  /** Runtime feature flags the host currently provides. */
+  features?: readonly string[];
+}
+
+export interface PluginGateResult {
+  readonly ok: boolean;
+  readonly reason?: string;
+}
+
+const CORE_PEER_KEYS = new Set(['@mudah-cli/core', 'core', '@mudah-cli/mudah']);
+
+/**
+ * Compatibility gate: skip a plugin when its declared peer range or
+ * required feature flags are not satisfied by the host.
+ */
+export function gatePlugin(plugin: PluginInfo, context: PluginGateContext): PluginGateResult {
+  const peers = plugin.peers ?? {};
+  for (const [pkg, range] of Object.entries(peers)) {
+    if (!CORE_PEER_KEYS.has(pkg)) continue;
+    if (!satisfiesPeerRange(context.coreVersion, range)) {
+      return {
+        ok: false,
+        reason: `${plugin.name} requires ${pkg} ${range} (have ${context.coreVersion})`,
+      };
+    }
+  }
+  const required = plugin.features ?? [];
+  if (required.length > 0) {
+    const have = new Set(context.features ?? []);
+    const missing = required.filter((flag) => !have.has(flag));
+    if (missing.length > 0) {
+      return { ok: false, reason: `${plugin.name} requires features: ${missing.join(', ')}` };
+    }
+  }
+  return { ok: true };
 }
 
 /**
@@ -244,7 +367,7 @@ export async function discoverPlugins(
       // Unresolvable or unimportable: skip it.
     }
   }
-  return loaded;
+  return sortPluginsByDependency(loaded);
 }
 
 async function readJson(path: string): Promise<unknown> {

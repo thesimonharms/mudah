@@ -39,3 +39,12 @@ export function createWatcher(paths: string[], onChange: () => void, options: Wa
     }
   };
 }
+
+/**
+ * Watch a plugin directory (typically `node_modules` or a local plugin
+ * folder) and invoke `onReload` after a quiet debounce. Uses
+ * {@link createWatcher}.
+ */
+export function watchPlugins(dir: string, onReload: () => void, options: WatcherOptions = {}): () => void {
+  return createWatcher([dir], onReload, options);
+}
