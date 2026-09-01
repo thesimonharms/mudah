@@ -3,7 +3,9 @@ import {
   BindingResolutionException,
   CircularDependencyException,
   Container,
+  inject,
   isClassLike,
+  singleton,
 } from '@mudah-cli/container';
 
 class Logger {
@@ -206,5 +208,114 @@ describe('Container', () => {
       scopedC = container.make('conn');
     });
     expect(scopedC).not.toBe(scopedA);
+  });
+
+  it('runInScope(group) only caches bindings registered for that group', () => {
+    const c = new Container();
+    let created = 0;
+    c.scoped('conn', () => ({ id: ++created }), 'request');
+    expect(c.make<{ id: number }>('conn').id).toBe(1);
+    let first: { id: number } | undefined;
+    let second: { id: number } | undefined;
+    c.runInScope('request', (container) => {
+      first = container.make('conn');
+      second = container.make('conn');
+    });
+    expect(first).toBe(second);
+    expect(first?.id).toBe(2);
+    c.runInScope('other', (container) => {
+      expect(container.make<{ id: number }>('conn').id).toBe(3);
+    });
+  });
+
+  it('bindings()/instances() filter by tag and group', () => {
+    const c = new Container();
+    c.bind('a', () => 1);
+    c.bind('b', () => 2);
+    c.tag('a', 'admin');
+    c.scoped('conn', () => ({}), 'request');
+    expect(c.bindings({ tag: 'admin' })).toEqual(['a']);
+    expect(c.bindings({ group: 'request' })).toEqual(['conn']);
+    c.singleton('shared', () => ({ n: 1 }));
+    c.tag('shared', 'admin');
+    c.make('shared');
+    expect(c.instances({ tag: 'admin' })).toEqual(['shared']);
+  });
+
+  it('snapshot() + rollback() restore bindings and instances', () => {
+    const c = new Container();
+    c.singleton('logger', Logger);
+    c.make('logger');
+    const snap = c.snapshot();
+    c.bind('extra', () => 1);
+    c.singleton('logger', () => new Logger());
+    expect(c.isBound('extra')).toBe(true);
+    c.rollback(snap);
+    expect(c.isBound('extra')).toBe(false);
+    expect(c.make<Logger>('logger')).toBeInstanceOf(Logger);
+    expect(c.instances()).toContain('logger');
+  });
+
+  it('dispose() calls dispose() on cached instances then flushes', async () => {
+    const c = new Container();
+    let disposed = 0;
+    c.instance('res', {
+      dispose() {
+        disposed += 1;
+      },
+    });
+    await c.dispose();
+    expect(disposed).toBe(1);
+    expect(c.instances()).toEqual([]);
+  });
+
+  it('makeAsync() awaits factories that return promises', async () => {
+    const c = new Container();
+    c.singleton('db', async () => ({ ready: true }));
+    await expect(c.makeAsync<{ ready: boolean }>('db')).resolves.toEqual({ ready: true });
+    expect(() => c.make('fresh')).toThrow(BindingResolutionException);
+    c.bind('fresh', async () => ({ n: 1 }));
+    expect(() => c.make('fresh')).toThrow(/makeAsync/);
+    await expect(c.makeAsync<{ n: number }>('fresh')).resolves.toEqual({ n: 1 });
+  });
+
+  it('@inject and @singleton decorate classes without emitDecoratorMetadata', () => {
+    class Decorated {
+      constructor(public readonly logger: Logger) {}
+    }
+    // Apply as functions so tests stay isolatedModules-safe without a decorator transform.
+    inject('logger')(Decorated);
+    singleton('svc')(Decorated);
+    const c = new Container();
+    c.singleton('logger', Logger);
+    c.registerDecorated(Decorated);
+    const a = c.make<Decorated>('svc');
+    const b = c.make<Decorated>('svc');
+    expect(a).toBe(b);
+    expect(a.logger).toBeInstanceOf(Logger);
+  });
+
+  it('loadProviders() binds an Angular-style providers array', () => {
+    const c = new Container();
+    c.loadProviders([
+      { provide: 'name', useValue: 'wired' },
+      { provide: 'logger', useClass: Logger, shared: true },
+      { provide: 'n', useFactory: () => 7, shared: false },
+    ]);
+    expect(c.make<string>('name')).toBe('wired');
+    expect(c.make<Logger>('logger')).toBe(c.make<Logger>('logger'));
+    expect(c.make<number>('n')).toBe(7);
+  });
+
+  it('when(context).use(abstract, factory) is the fluent contextual form', () => {
+    const c = new Container();
+    c.bind('client', () => ({ channel: 'default' }));
+    class Outer {
+      static readonly dependencies = ['client'] as const;
+      constructor(public readonly client: { channel: string }) {}
+    }
+    c.when(Outer).use('client', () => ({ channel: 'fluent' }));
+    c.bind('outer', Outer);
+    expect(c.make<Outer>('outer').client.channel).toBe('fluent');
   });
 });

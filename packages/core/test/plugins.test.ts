@@ -4,8 +4,12 @@ import {
   ServiceProvider,
   discoverPlugins,
   findPluginPackages,
+  gatePlugin,
   loadPlugin,
+  satisfiesPeerRange,
+  sortPluginsByDependency,
   type PluginDiscoveryOptions,
+  type PluginInfo,
 } from '@mudah-cli/core';
 
 /**
@@ -235,5 +239,45 @@ describe('Application.discoverPlugins', () => {
     const app = new Application('/app', { name: 'host', version: '1.0.0', bin: 'host' });
     const plugins = await app.discoverPlugins(fakeRegistry({ 'plain-dep': { keywords: [] } }));
     expect(plugins).toEqual([]);
+  });
+});
+
+describe('plugin dependency graph', () => {
+  it('sorts dependents after their dependencies', () => {
+    const plugins = [
+      { name: 'b', providers: [], commands: [], depends: ['a'] },
+      { name: 'a', providers: [], commands: [], depends: [] },
+    ] as PluginInfo[];
+    expect(sortPluginsByDependency(plugins).map((p) => p.name)).toEqual(['a', 'b']);
+  });
+
+  it('satisfies caret and gte peer ranges', () => {
+    expect(satisfiesPeerRange('0.8.1', '^0.8.0')).toBe(true);
+    expect(satisfiesPeerRange('1.0.0', '^0.8.0')).toBe(false);
+    expect(satisfiesPeerRange('0.8.0', '>=0.7.0')).toBe(true);
+  });
+});
+
+describe('gatePlugin', () => {
+  it('skips a plugin whose core peer range is not satisfied', () => {
+    const plugin = {
+      name: 'old-plugin',
+      providers: [],
+      commands: [],
+      peers: { '@mudah-cli/core': '^1.0.0' },
+    };
+    const result = gatePlugin(plugin, { coreVersion: '0.8.0' });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('old-plugin');
+  });
+
+  it('accepts a matching peer range', () => {
+    const plugin = {
+      name: 'ok-plugin',
+      providers: [],
+      commands: [],
+      peers: { '@mudah-cli/core': '^0.8.0' },
+    };
+    expect(gatePlugin(plugin, { coreVersion: '0.8.1' }).ok).toBe(true);
   });
 });

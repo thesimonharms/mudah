@@ -1,4 +1,18 @@
 export { TestApp, TestResult, type TestAppOptions } from './test-app.js';
-export { TestTui, type TestTuiOptions } from './test-tui.js';
+export {
+  TestTui,
+  assertFast,
+  type TestTuiAction,
+  type TestTuiMeasure,
+  type TestTuiOptions,
+} from './test-tui.js';
 export { assertHasColor, assertLacksColor, type ColorExpectation } from './snapshot-assert.js';
 export { FsMock } from './fs-mock.js';
+export { diffSnapshots, diffTrees } from './visual-diff.js';
+export {
+  MockPluginRegistry,
+  createMockPlugin,
+  type MockPlugin,
+  type MockPluginOptions,
+} from './plugin-mock.js';
+export { SessionRecorder, type ReplayHandle, type SessionAction } from '@mudah-cli/tui';

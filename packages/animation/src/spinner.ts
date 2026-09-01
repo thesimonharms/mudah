@@ -14,6 +14,12 @@ export interface SpinnerOptions {
   reducedMotion?: boolean;
   /** Master switch — pass false to disable all output. */
   enabled?: boolean;
+  /** Fired from `start()`. */
+  onStart?: () => void;
+  /** Fired on the initial frame and each subsequent tick. */
+  onProgress?: (frame: number, total: number) => void;
+  /** Fired from `stop()`. */
+  onComplete?: () => void;
 }
 
 /**
@@ -35,6 +41,9 @@ export class Spinner {
   private frame = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private staticWritten = false;
+  private readonly onStartHook?: () => void;
+  private readonly onProgressHook?: (frame: number, total: number) => void;
+  private readonly onCompleteHook?: () => void;
 
   constructor(options: SpinnerOptions = {}) {
     const named = options.styleName ? spinnerStyles[options.styleName] : undefined;
@@ -44,11 +53,16 @@ export class Spinner {
     this.interval = options.interval ?? named?.interval ?? defaultSpinner.interval;
     this.reducedMotion = options.reducedMotion ?? false;
     this.enabled = options.enabled ?? (this.stream as { isTTY?: boolean }).isTTY === true;
+    this.onStartHook = options.onStart;
+    this.onProgressHook = options.onProgress;
+    this.onCompleteHook = options.onComplete;
   }
 
   start(label: string): void {
     this.label = label;
     this.frame = 0;
+    this.onStartHook?.();
+    this.onProgressHook?.(this.frame, this.frames.length);
     if (!this.enabled) return;
 
     if (this.reducedMotion) {
@@ -60,6 +74,7 @@ export class Spinner {
     this.writeLine(this.renderFrame());
     this.timer = setInterval(() => {
       this.frame = (this.frame + 1) % this.frames.length;
+      this.onProgressHook?.(this.frame, this.frames.length);
       this.stream.write('\r\x1b[2K');
       this.writeLine(this.renderFrame());
     }, this.interval);
@@ -82,12 +97,14 @@ export class Spinner {
       clearInterval(this.timer);
       this.timer = null;
     }
-    if (!this.enabled) return;
-    this.stream.write('\r\x1b[2K');
-    if (finalLabel) {
-      this.stream.write(finalLabel + '\n');
+    if (this.enabled) {
+      this.stream.write('\r\x1b[2K');
+      if (finalLabel) {
+        this.stream.write(finalLabel + '\n');
+      }
     }
     this.staticWritten = false;
+    this.onCompleteHook?.();
   }
 
   /** Run `fn` under a spinner; always stops, even on error. */

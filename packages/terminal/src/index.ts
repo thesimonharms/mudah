@@ -1,9 +1,13 @@
 export { ansi } from './ansi.js';
 export {
   detectCapabilities,
+  detectColorLevel,
+  sniffPalette,
+  pickColorFallback,
   type CapabilityOverrides,
   type ColorLevel,
   type DetectCapabilitiesOptions,
+  type SniffPaletteOptions,
   type TerminalBrand,
   type TerminalCapabilities,
 } from './capabilities.js';
@@ -21,7 +25,26 @@ export {
   type ThemeQueryOptions,
   type ThemeQueryResult,
 } from './theme-query.js';
-export { enterRawMode, KeyParser, parseKeys, enableKittyKeyboard, disableKittyKeyboard, enableBracketedPaste, disableBracketedPaste, KITTY_KEYBOARD, KITTY_KEYBOARD_KEYUP, type KeyEvent, type KeyKind, type KeyName } from './keys.js';
+export { watchTheme, type WatchThemeOptions, type WatchThemeProcess } from './theme-watch.js';
+export { pollTerminalSize, type PollTerminalSizeOptions, type TerminalSize } from './size.js';
+export {
+  enterRawMode,
+  KeyParser,
+  parseKeys,
+  normalizeKey,
+  normalizeKeys,
+  enableKittyKeyboard,
+  disableKittyKeyboard,
+  enableBracketedPaste,
+  disableBracketedPaste,
+  KITTY_KEYBOARD,
+  KITTY_KEYBOARD_KEYUP,
+  type KeyEvent,
+  type KeyKind,
+  type KeyName,
+  type NormalizedKey,
+  type ParseKeysOptions,
+} from './keys.js';
 export {
   KittyGraphics,
   encodeHalfBlocks,

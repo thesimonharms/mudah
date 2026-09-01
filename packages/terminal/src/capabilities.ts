@@ -84,17 +84,19 @@ export function detectCapabilities(options: DetectCapabilitiesOptions = {}): Ter
   const overrides = options.overrides ?? {};
 
   const brand = detectBrand(env);
-  const colorLevel = detectColorLevel(isTty, env);
+  const colorLevel = sniffPalette({ env, isTty });
+  const headless = env['MUDAH_HEADLESS'] === '1' || env['MUDAH_HEADLESS'] === 'true';
   const reducedMotion =
-    overrides.reducedMotion ?? (env['MUDAH_REDUCED_MOTION'] === '1' || env['NO_ANIMATION'] === '1');
+    overrides.reducedMotion ??
+    (headless || env['MUDAH_REDUCED_MOTION'] === '1' || env['NO_ANIMATION'] === '1');
 
   return {
-    isTty,
+    isTty: headless ? false : isTty,
     color: overrides.color ?? colorLevel > 0,
     colorLevel,
     trueColor: colorLevel === 24,
     unicode: overrides.unicode ?? env['TERM'] !== 'dumb',
-    animations: isTty && !reducedMotion && env['CI'] !== 'true' && env['CI'] !== '1',
+    animations: isTty && !headless && !reducedMotion && env['CI'] !== 'true' && env['CI'] !== '1',
     reducedMotion,
     osc9: brand === 'ghostty' || brand === 'wezterm',
     osc133:
@@ -126,7 +128,46 @@ function detectBrand(env: NodeJS.ProcessEnv): TerminalBrand {
   return 'unknown';
 }
 
-function detectColorLevel(isTty: boolean, env: NodeJS.ProcessEnv): ColorLevel {
+export interface SniffPaletteOptions {
+  /** Environment map (defaults to `process.env`). */
+  env?: NodeJS.ProcessEnv;
+  /** Explicit COLORTERM override, merged into `env` when set. */
+  colorterm?: string;
+  /** Explicit FORCE_COLOR override, merged into `env` when set. */
+  forceColor?: string;
+  /** Whether output is a TTY (defaults to `process.stdout.isTTY`). */
+  isTty?: boolean;
+}
+
+/**
+ * Sniff the effective color palette. Wraps the same detection `detectCapabilities`
+ * uses; extra `colorterm` / `forceColor` fields override the corresponding env
+ * keys without mutating the caller's map.
+ */
+export function sniffPalette(options: SniffPaletteOptions = {}): ColorLevel {
+  const base = options.env ?? process.env;
+  const env: NodeJS.ProcessEnv =
+    options.colorterm !== undefined || options.forceColor !== undefined
+      ? {
+          ...base,
+          ...(options.colorterm !== undefined ? { COLORTERM: options.colorterm } : {}),
+          ...(options.forceColor !== undefined ? { FORCE_COLOR: options.forceColor } : {}),
+        }
+      : base;
+  const isTty = options.isTty ?? process.stdout.isTTY === true;
+  return detectColorLevel(isTty, env);
+}
+
+/**
+ * Pick the richest palette that is both desired and available.
+ * Levels are totally ordered: 0 < 1 (16-color) < 8 (256) < 24 (truecolor).
+ */
+export function pickColorFallback(desired: ColorLevel, available: ColorLevel): ColorLevel {
+  return desired <= available ? desired : available;
+}
+
+/** Detect color level from a TTY flag and environment. Default sniff path. */
+export function detectColorLevel(isTty: boolean, env: NodeJS.ProcessEnv): ColorLevel {
   if (env['NO_COLOR'] !== undefined) return 0;
 
   const forced = env['FORCE_COLOR'];

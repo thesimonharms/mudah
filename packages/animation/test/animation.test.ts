@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Ticker } from '@mudah-cli/terminal';
-import { ProgressBar, Spinner, TaskRunner } from '@mudah-cli/animation';
+import { AnimationClock, ProgressBar, Spinner, TaskRunner } from '@mudah-cli/animation';
 
 function collector(isTTY = false): { stream: { write(data: string): unknown; isTTY?: boolean }; text(): string } {
   const state = { value: '' };
@@ -93,6 +93,102 @@ describe('ProgressBar', () => {
     const bar = new ProgressBar({ total: 3, stream, enabled: false });
     bar.inc();
     expect(text()).toBe('');
+  });
+
+  it('renders an indeterminate bouncing block without a percentage', () => {
+    const bar = new ProgressBar({ mode: 'indeterminate', width: 8 });
+    const first = bar.render();
+    expect(first).toMatch(/^\[.*\]$/);
+    expect(first).not.toMatch(/%/);
+    expect(first).not.toMatch(/\d+\/\d+/);
+    bar.tick();
+    const second = bar.render();
+    expect(second).not.toBe(first);
+    expect(second).not.toMatch(/%/);
+  });
+
+  it('keeps the existing { total } constructor working', () => {
+    const bar = new ProgressBar({ total: 10, width: 10 });
+    bar.set(5);
+    expect(bar.render()).toBe('[█████░░░░░] 50% 5/10');
+    expect(bar.mode).toBe('determinate');
+  });
+
+  it('fires onStart, onProgress, and onComplete', () => {
+    const events: string[] = [];
+    const bar = new ProgressBar({
+      total: 2,
+      onStart: () => events.push('start'),
+      onProgress: (value, total) => events.push(`p:${value}/${total}`),
+      onComplete: () => events.push('done'),
+    });
+    expect(events).toEqual([]);
+    bar.set(1);
+    bar.inc();
+    bar.complete();
+    expect(events[0]).toBe('start');
+    expect(events).toContain('p:1/2');
+    expect(events).toContain('p:2/2');
+    expect(events.at(-1)).toBe('done');
+    expect(events.filter((e) => e === 'start')).toHaveLength(1);
+    expect(events.filter((e) => e === 'done')).toHaveLength(1);
+  });
+});
+
+describe('Spinner hooks', () => {
+  it('fires onStart / onProgress / onComplete', async () => {
+    const events: string[] = [];
+    const { stream } = collector(true);
+    const spinner = new Spinner({
+      stream,
+      enabled: true,
+      interval: 1,
+      onStart: () => events.push('start'),
+      onProgress: (frame, total) => events.push(`p:${frame}/${total}`),
+      onComplete: () => events.push('done'),
+    });
+    spinner.start('Working');
+    await sleep(15);
+    spinner.stop('Done');
+    expect(events[0]).toBe('start');
+    expect(events.some((e) => e.startsWith('p:'))).toBe(true);
+    expect(events.at(-1)).toBe('done');
+  });
+});
+
+describe('AnimationClock', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('delivers injected delta-time ticks', () => {
+    let t = 1000;
+    const clock = new AnimationClock({ now: () => t });
+    const dts: number[] = [];
+    clock.onFrame((dt) => dts.push(dt));
+    clock.tick(16);
+    clock.tick(33);
+    expect(dts).toEqual([16, 33]);
+    expect(clock.now()).toBe(1000);
+    t = 1048;
+    expect(clock.now()).toBe(1048);
+  });
+
+  it('start/stop drive frames from the injected clock', () => {
+    vi.useFakeTimers();
+    let t = 0;
+    const clock = new AnimationClock({ fps: 50, now: () => t });
+    const dts: number[] = [];
+    const off = clock.onFrame((dt) => dts.push(dt));
+    clock.start();
+    expect(clock.running).toBe(true);
+    t = 20;
+    vi.advanceTimersByTime(20);
+    clock.stop();
+    expect(clock.running).toBe(false);
+    expect(dts.length).toBeGreaterThanOrEqual(1);
+    expect(dts[0]).toBe(20);
+    off();
   });
 });
 

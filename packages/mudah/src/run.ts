@@ -1,17 +1,22 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   Application,
   UsageError,
   loadManifest,
   checkForUpdate,
+  createTelemetry,
   formatUpdateNudge,
   type Application as App,
   type BootProfile,
   type MudahManifest,
+  type TelemetrySink,
   type UpdateCheckOptions,
 } from '@mudah-cli/core';
 import { detectCapabilities, osc, type TerminalCapabilities, type ThemeQueryInput } from '@mudah-cli/terminal';
 import { Output, detectTheme, renderTable } from '@mudah-cli/ui';
 import { ConsoleKernel, renderError, renderCommandHelp, renderCommandList, parseSignature, type CommandModule } from '@mudah-cli/console';
+import { normalizeAutocompleteShell, renderAutocompleteScript } from './autocomplete.js';
 import HelpCommand from './commands/help.command.js';
 import VersionCommand from './commands/version.command.js';
 import MakeCommand from './commands/make.command.js';
@@ -20,9 +25,27 @@ import DoctorCommand from './commands/doctor.command.js';
 import ConfigShowCommand from './commands/config.show.command.js';
 import ConfigDiffCommand from './commands/config.diff.command.js';
 import ConfigSetCommand from './commands/config.set.command.js';
+import ConfigSourceCommand from './commands/config.source.command.js';
 import ConfigValidateCommand from './commands/config.validate.command.js';
 import DevCommand from './commands/dev.command.js';
 import InfoCommand from './commands/info.command.js';
+import TutorialCommand from './commands/tutorial.command.js';
+import LspCommand from './commands/lsp.command.js';
+import ReplayCommand from './commands/replay.command.js';
+import SandboxCommand from './commands/sandbox.command.js';
+import TestCommand from './commands/test.command.js';
+import StorybookCommand from './commands/storybook.command.js';
+import DeployCommand from './commands/deploy.command.js';
+import WatchCommand from './commands/watch.command.js';
+import DocsWidgetsCommand from './commands/docs.widgets.command.js';
+import PluginsListCommand from './commands/plugins.list.command.js';
+import PluginsUpdateCommand from './commands/plugins.update.command.js';
+import MigrateCommand from './commands/migrate.command.js';
+import AuditCommand from './commands/audit.command.js';
+import CacheCommand from './commands/cache.command.js';
+import GraphCommand from './commands/graph.command.js';
+import AutocompleteCommand from './commands/autocomplete.command.js';
+import CompleteCommand from './commands/complete.command.js';
 
 /** Parsed timeout in milliseconds. */
 function parseTimeout(value: string): number {
@@ -48,6 +71,162 @@ function parseMemory(value: string): number {
   if (unit === 'gb') return Math.round(n * 1_073_741_824);
   if (unit === 'tb') return Math.round(n * 1_099_511_627_776);
   return Math.round(n);
+}
+
+interface GlobalFlags {
+  json: boolean;
+  plain: boolean;
+  profile: boolean;
+  profileFile?: string;
+  timeoutMs: number;
+  memoryLimit: number;
+  headless: boolean;
+  a11yTree: boolean;
+  trace: boolean;
+  autocomplete?: string;
+}
+
+/** Pull global flags out of argv (mutates the array). */
+function consumeGlobalFlags(argv: string[], env: NodeJS.ProcessEnv): GlobalFlags {
+  const flags: GlobalFlags = {
+    json: false,
+    plain: false,
+    profile: false,
+    timeoutMs: 0,
+    memoryLimit: 0,
+    headless: env['MUDAH_HEADLESS'] === '1' || env['MUDAH_HEADLESS'] === 'true',
+    a11yTree: env['MUDAH_A11Y_TREE'] === '1',
+    trace: false,
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--json') {
+      flags.json = true;
+      continue;
+    }
+    if (arg === '--plain') {
+      flags.plain = true;
+      continue;
+    }
+    if (arg === '--profile') {
+      flags.profile = true;
+      continue;
+    }
+    if (arg === '--headless') {
+      flags.headless = true;
+      argv.splice(i, 1);
+      i--;
+      continue;
+    }
+    if (arg === '--trace') {
+      flags.trace = true;
+      argv.splice(i, 1);
+      i--;
+      continue;
+    }
+    if (arg === '--a11y-tree') {
+      flags.a11yTree = true;
+      argv.splice(i, 1);
+      i--;
+      continue;
+    }
+    if (arg === '--timeout' && i + 1 < argv.length) {
+      flags.timeoutMs = parseTimeout(argv[i + 1]!);
+      argv.splice(i, 2);
+      i--;
+      continue;
+    }
+    if (arg.startsWith('--timeout=')) {
+      flags.timeoutMs = parseTimeout(arg.slice(10));
+      argv.splice(i, 1);
+      i--;
+      continue;
+    }
+    if (arg === '--memory' && i + 1 < argv.length) {
+      flags.memoryLimit = parseMemory(argv[i + 1]!);
+      argv.splice(i, 2);
+      i--;
+      continue;
+    }
+    if (arg.startsWith('--memory=')) {
+      flags.memoryLimit = parseMemory(arg.slice(9));
+      argv.splice(i, 1);
+      i--;
+      continue;
+    }
+    if (arg === '--profile-file' && i + 1 < argv.length) {
+      flags.profileFile = argv[i + 1];
+      argv.splice(i, 2);
+      i--;
+      continue;
+    }
+    if (arg.startsWith('--profile-file=')) {
+      flags.profileFile = arg.slice(15);
+      argv.splice(i, 1);
+      i--;
+      continue;
+    }
+    if (arg === '--autocomplete') {
+      const next = argv[i + 1];
+      flags.autocomplete = next !== undefined && !next.startsWith('-') ? next : 'bash';
+      argv.splice(i, flags.autocomplete === next ? 2 : 1);
+      i--;
+      continue;
+    }
+    if (arg.startsWith('--autocomplete=')) {
+      flags.autocomplete = arg.slice(15);
+      argv.splice(i, 1);
+      i--;
+    }
+  }
+  return flags;
+}
+
+function resolveProfileFile(cwd: string, flags: GlobalFlags, env: NodeJS.ProcessEnv): string | undefined {
+  if (flags.profileFile !== undefined && flags.profileFile.length > 0) return flags.profileFile;
+  if (!flags.profile) return undefined;
+  const fromEnv = env['MUDAH_PROFILE_FILE'];
+  if (fromEnv === undefined) return undefined;
+  return fromEnv.length > 0 ? fromEnv : join(cwd, '.mudah', 'profile.json');
+}
+
+/** Chrome-trace / simple `{ name, ph, ts, dur }` events for flamegraphing. */
+function writeChromeTrace(
+  file: string,
+  boot: BootProfile | undefined,
+  totals: { command?: string; commandMs: number; totalMs: number },
+): void {
+  const events: Array<{ name: string; ph: string; ts: number; dur: number; pid: number; tid: number }> = [];
+  let ts = 0;
+  if (boot !== undefined) {
+    events.push({ name: 'boot', ph: 'X', ts: 0, dur: boot.totalMs * 1000, pid: 1, tid: 1 });
+    for (const timing of boot.providers) {
+      events.push({
+        name: `${timing.provider}.${timing.hook}`,
+        ph: 'X',
+        ts,
+        dur: timing.durationMs * 1000,
+        pid: 1,
+        tid: 1,
+      });
+      ts += timing.durationMs * 1000;
+    }
+  }
+  events.push({
+    name: totals.command === undefined ? 'command' : `command ${totals.command}`,
+    ph: 'X',
+    ts,
+    dur: totals.commandMs * 1000,
+    pid: 1,
+    tid: 1,
+  });
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `${JSON.stringify({ traceEvents: events }, null, 2)}\n`, 'utf8');
+  } catch {
+    // A read-only filesystem just means no profile file.
+  }
 }
 
 export interface RunOptions {
@@ -96,6 +275,8 @@ export interface RunOptions {
    * are skipped with a warning.
    */
   commands?: CommandModule[];
+  /** Collect boot/perf events when the app opts into telemetry. */
+  telemetrySink?: TelemetrySink;
 }
 
 /**
@@ -114,8 +295,15 @@ export interface RunOptions {
 export async function run(options: RunOptions = {}): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const argv = options.argv ?? process.argv.slice(2);
-  const env = options.env;
-  const caps = detectCapabilities({ env });
+  const env: NodeJS.ProcessEnv = { ...(options.env ?? process.env) };
+  const flags = consumeGlobalFlags(argv, env);
+  if (flags.headless) {
+    env['MUDAH_HEADLESS'] = '1';
+    env['MUDAH_REDUCED_MOTION'] = '1';
+    if (env['CI'] === undefined || env['CI'] === '') env['CI'] = '1';
+  }
+  if (flags.a11yTree) env['MUDAH_A11Y_TREE'] = '1';
+  const caps = detectCapabilities({ env, isTty: flags.headless ? false : undefined });
 
   // Resolved once: every later write (envelopes included) targets these, so
   // output modes work with or without injected streams.
@@ -132,6 +320,17 @@ export async function run(options: RunOptions = {}): Promise<number> {
   }
 
   const app = options.app ?? new Application(cwd, manifest);
+  app.config().set('mudah.headless', flags.headless);
+  app.config().set('mudah.a11yTree', flags.a11yTree);
+  if (flags.trace && typeof app.events().trace === 'function') {
+    app.events().trace(true);
+  }
+
+  if (flags.autocomplete !== undefined) {
+    const script = renderAutocompleteScript(manifest.bin, normalizeAutocompleteShell(flags.autocomplete));
+    stdout.write(script.endsWith('\n') ? script : `${script}\n`);
+    return 0;
+  }
 
   const theme = await detectTheme({
     name: manifest.ui?.theme,
@@ -149,39 +348,22 @@ export async function run(options: RunOptions = {}): Promise<number> {
   });
 
   // Output-mode flags (--json / --plain) may appear anywhere.
-  if (argv.includes('--json')) {
+  if (flags.json) {
     output.setMode('json');
-  } else if (argv.includes('--plain')) {
+  } else if (flags.plain) {
     output.setMode('plain');
   }
   const jsonMode = output.isMachineReadable;
-  const profileMode = argv.includes('--profile');
-
-  // Parse and strip global timeout/memory flags.
-  let timeoutMs = 0;
-  let memoryLimit = 0;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === '--timeout' && i + 1 < argv.length) {
-      timeoutMs = parseTimeout(argv[i + 1]!);
-      argv.splice(i, 2);
-      i--;
-    } else if (arg.startsWith('--timeout=')) {
-      timeoutMs = parseTimeout(arg.slice(10));
-      argv.splice(i, 1);
-      i--;
-    } else if (arg === '--memory' && i + 1 < argv.length) {
-      memoryLimit = parseMemory(argv[i + 1]!);
-      argv.splice(i, 2);
-      i--;
-    } else if (arg.startsWith('--memory=')) {
-      memoryLimit = parseMemory(arg.slice(9));
-      argv.splice(i, 1);
-      i--;
-    }
-  }
+  const profileMode = flags.profile;
+  const timeoutMs = flags.timeoutMs;
+  const memoryLimit = flags.memoryLimit;
+  const profileFile = resolveProfileFile(cwd, flags, env);
 
   const startedAt = Date.now();
+  const telemetry = createTelemetry({
+    enabled: manifest.telemetry === true,
+    sink: options.telemetrySink,
+  });
 
   // Advertise the working directory (OSC 7) once on launch so terminals that
   // track cwd pick it up. Skipped off-TTY and in JSON mode so logs stay clean.
@@ -206,18 +388,26 @@ export async function run(options: RunOptions = {}): Promise<number> {
   // Plugins first: their providers must be registered before boot, and their
   // commands join the same discovery list as the app's own.
   const plugins = options.disablePlugins === true ? [] : await app.discoverPlugins();
+  if (!jsonMode) {
+    for (const warning of app.pluginWarnings()) {
+      output.warn(warning);
+    }
+  }
 
   // Providers: discover app providers, boot, then evaluate lazy predicates.
   await app.discoverProviders();
   const bootProfile = await app.boot({ profile: profileMode });
   await app.evaluateLazy();
+  if (telemetry.enabled) {
+    telemetry.recordDuration('boot', bootProfile?.totalMs ?? Date.now() - startedAt);
+  }
 
   // Kernel: built-ins first, then — in order — discovered app commands,
   // manifest extras, and explicitly injected modules (bundled apps).
   // First registration of a name wins; later duplicates are skipped so a
   // checkout that both discovers and injects the same command stays clean.
   const kernel = new ConsoleKernel(app, output);
-  registerBuiltIns(kernel);
+  registerReservedBuiltIns(kernel);
   const seen = new Set(kernel.list().map((entry) => entry.name));
 
   const candidates = [
@@ -248,10 +438,22 @@ export async function run(options: RunOptions = {}): Promise<number> {
     }
   }
 
+  // Framework built-ins fill remaining names so an app `deploy`/`test`/`watch`
+  // keeps precedence over the ROADMAP defaults.
+  registerFrameworkBuiltIns(kernel, seen);
+
   // Strip the global flags before dispatch so commands don't see them as
   // unknown options; remember the command name for envelopes/errors.
   const dispatchArgv = argv.filter(
-    (a) => a !== '--json' && a !== '--plain' && a !== '--profile',
+    (a) =>
+      a !== '--json' &&
+      a !== '--plain' &&
+      a !== '--profile' &&
+      a !== '--headless' &&
+      a !== '--trace' &&
+      a !== '--a11y-tree' &&
+      !a.startsWith('--profile-file') &&
+      !a.startsWith('--autocomplete'),
   );
   const commandName = dispatchArgv[0];
 
@@ -267,7 +469,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const lines: string[] = [];
     renderCommandList(manifest.name, manifest.version, kernel.list(), lines);
     output.raw(lines.join('\n'));
-    output.raw('\n\nGlobal flags:\n  --help/-h  Show this help\n  --version  Show the version\n  --json     Machine-readable JSON output\n  --plain    Strip all ANSI styling\n  --profile  Print boot and command timings\n  --timeout  Kill command after N ms (e.g. --timeout=5s)\n  --memory   Kill command when heap exceeds N MB (e.g. --memory=512mb)');
+    output.raw('\n\nGlobal flags:\n  --help/-h  Show this help\n  --version  Show the version\n  --json     Machine-readable JSON output\n  --plain    Strip all ANSI styling\n  --profile  Print boot and command timings\n  --profile-file  Write Chrome-trace timings to a JSON file\n  --timeout  Kill command after N ms (e.g. --timeout=5s)\n  --memory   Kill command when heap exceeds N MB (e.g. --memory=512mb)\n  --headless  Non-TTY, no animations (CI)\n  --trace    Log every event-bus dispatch\n  --a11y-tree  Reserved / doctor accessibility dump\n  --autocomplete  Emit bash/zsh/fish completion script');
     return 0;
   }
   if (first === '--version') {
@@ -329,8 +531,23 @@ export async function run(options: RunOptions = {}): Promise<number> {
     if (memoryTimer) clearInterval(memoryTimer);
   }
 
+  if (first === 'complete') {
+    const rest = dispatchArgv.slice(1).filter((token) => token !== '--');
+    const candidates = kernel.complete(rest);
+    stdout.write(candidates.length > 0 ? `${candidates.join('\n')}\n` : '');
+    return 0;
+  }
+
   try {
     const code = await kernel.dispatch(resolveGroup(kernel, dispatchArgv));
+    const totals = {
+      command: commandName,
+      commandMs: Date.now() - startedAt - (bootProfile?.totalMs ?? 0),
+      totalMs: Date.now() - startedAt,
+    };
+    if (profileFile !== undefined) {
+      writeChromeTrace(profileFile, bootProfile, totals);
+    }
     if (jsonMode) {
       stdout.write(
         output.jsonEnvelope({
@@ -343,11 +560,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       );
     } else {
       if (profileMode) {
-        renderProfile(output, bootProfile, caps, {
-          command: commandName,
-          commandMs: Date.now() - startedAt - (bootProfile?.totalMs ?? 0),
-          totalMs: Date.now() - startedAt,
-        });
+        renderProfile(output, bootProfile, caps, totals);
       }
       if (code === 0) await nudgeUpdate(output, manifest, updateOptions);
     }
@@ -360,6 +573,9 @@ export async function run(options: RunOptions = {}): Promise<number> {
       parsed = { message: rawError.message };
     } else {
       parsed = { message: String(rawError) };
+    }
+    if (typeof app.notifyError === 'function') {
+      await app.notifyError(rawError).catch(() => undefined);
     }
     const code = renderError(rawError, output);
     if (jsonMode) {
@@ -452,7 +668,7 @@ async function nudgeUpdate(
   if (line !== null) output.muted(line);
 }
 
-function registerBuiltIns(kernel: ConsoleKernel): void {
+function registerReservedBuiltIns(kernel: ConsoleKernel): void {
   kernel.register({
     default: class extends HelpCommand {
       constructor() {
@@ -461,19 +677,79 @@ function registerBuiltIns(kernel: ConsoleKernel): void {
     },
   });
   kernel.register({ default: VersionCommand });
-  kernel.register({ default: MakeCommand });
-  kernel.register({ default: BuildCommand });
-  kernel.register({ default: DoctorCommand });
-  kernel.register({ default: ConfigShowCommand });
-  kernel.register({ default: ConfigDiffCommand });
-  kernel.register({ default: InfoCommand });
-  kernel.register({ default: ConfigSetCommand });
-  kernel.register({ default: ConfigValidateCommand });
-  kernel.register({
+}
+
+function nameTaken(seen: Set<string>, name: string): boolean {
+  if (seen.has(name)) return true;
+  const prefix = `${name}:`;
+  for (const existing of seen) {
+    if (existing.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+function registerIfFree(kernel: ConsoleKernel, seen: Set<string>, module: CommandModule): void {
+  try {
+    const name = parseSignature(new module.default().signature ?? '').name;
+    if (name === '' || nameTaken(seen, name)) return;
+    seen.add(name);
+    kernel.register(module);
+  } catch {
+    // Signature-less modules are skipped; kernel.register throws elsewhere.
+  }
+}
+
+function registerFrameworkBuiltIns(kernel: ConsoleKernel, seen: Set<string>): void {
+  const register = (module: CommandModule) => registerIfFree(kernel, seen, module);
+  register({ default: MakeCommand });
+  register({ default: BuildCommand });
+  register({ default: DoctorCommand });
+  register({ default: ConfigShowCommand });
+  register({ default: ConfigDiffCommand });
+  register({ default: InfoCommand });
+  register({ default: ConfigSetCommand });
+  register({ default: ConfigSourceCommand });
+  register({ default: ConfigValidateCommand });
+  register({
     default: class extends DevCommand {
       constructor() {
         super(kernel);
       }
     },
   });
+  register({ default: PluginsListCommand });
+  register({ default: PluginsUpdateCommand });
+  register({ default: MigrateCommand });
+  register({ default: AuditCommand });
+  register({ default: CacheCommand });
+  register({ default: GraphCommand });
+  register({ default: AutocompleteCommand });
+  register({
+    default: class extends CompleteCommand {
+      constructor() {
+        super(kernel);
+      }
+    },
+  });
+  register({
+    default: class extends WatchCommand {
+      constructor() {
+        super(kernel);
+      }
+    },
+  });
+  register({ default: TutorialCommand });
+  register({ default: LspCommand });
+  register({ default: ReplayCommand });
+  register({
+    default: class extends SandboxCommand {
+      constructor() {
+        super(kernel);
+      }
+    },
+  });
+  register({ default: TestCommand });
+  register({ default: StorybookCommand });
+  register({ default: DeployCommand });
+  register({ default: DocsWidgetsCommand });
 }

@@ -12,6 +12,7 @@ import type {
   SpawnTool,
 } from './types.js';
 import { decodeWav } from './wav.js';
+import { decodeMp3, looksLikeMp3 } from './mp3.js';
 
 interface MixClip {
   samples: Int16Array;
@@ -134,7 +135,14 @@ export class AudioOut {
   }
 
   private normalize(source: PlaySource): Int16Array {
-    const clip: AudioClip = source instanceof Uint8Array ? decodeWav(source) : source;
+    if (!(source instanceof Uint8Array)) {
+      return remapChannels(source.samples, source.channels, this.channels);
+    }
+    if (looksLikeMp3(source) && !looksLikeWav(source)) {
+      const decoded = decodeMp3(source);
+      return remapChannels(floatToS16(decoded.samples), decoded.channels, this.channels);
+    }
+    const clip: AudioClip = decodeWav(source);
     return remapChannels(clip.samples, clip.channels, this.channels);
   }
 
@@ -182,6 +190,21 @@ function f32le(samples: Int16Array): Uint8Array {
   const out = new Uint8Array(samples.length * 4);
   const view = new DataView(out.buffer);
   for (let i = 0; i < samples.length; i++) view.setFloat32(i * 4, (samples[i] ?? 0) / 32768, true);
+  return out;
+}
+
+function looksLikeWav(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 12) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return view.getUint32(0, true) === 0x46464952 && view.getUint32(8, true) === 0x45564157;
+}
+
+function floatToS16(samples: Float32Array): Int16Array {
+  const out = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    const x = samples[i] ?? 0;
+    out[i] = Math.max(-32768, Math.min(32767, Math.round(x * 32767)));
+  }
   return out;
 }
 

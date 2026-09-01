@@ -33,6 +33,17 @@ export abstract class ServiceProvider {
   onConfigChanged(key: string): void | Promise<void> {}
 
   /**
+   * Called when a command or boot hook throws.
+   */
+  onError(error: unknown): void | Promise<void> {}
+
+  /**
+   * Optional health probe. Return status + optional detail; latency is measured
+   * by {@link Application.health}.
+   */
+  health(): { status: 'ok' | 'error' | 'skipped'; detail?: string } | Promise<{ status: 'ok' | 'error' | 'skipped'; detail?: string }> | void {}
+
+  /**
    * Import a config file and merge it as defaults under `key`
    * (existing values win).
    */

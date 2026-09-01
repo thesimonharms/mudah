@@ -109,7 +109,8 @@ class WizardBody extends BaseComponent {
       items.forEach((item, i) => {
         const pointer = i === this.cursor ? '▸ ' : '  ';
         if (step.kind === 'multi') {
-          const set = (this.picked.get(this.step) as Set<number> | undefined) ?? new Set();
+          const raw = this.picked.get(this.step);
+          const set = raw instanceof Set ? raw : new Set<number>();
           const box = set.has(i) ? '[x] ' : '[ ] ';
           lines.push(`${pointer}${box}${item}`);
         } else {
@@ -133,7 +134,8 @@ class WizardBody extends BaseComponent {
       return true;
     }
     if (event.name === 'space' && step.kind === 'multi') {
-      const set = (this.picked.get(this.step) as Set<number> | undefined) ?? new Set();
+      const raw = this.picked.get(this.step);
+      const set = raw instanceof Set ? raw : new Set<number>();
       if (set.has(this.cursor)) set.delete(this.cursor);
       else set.add(this.cursor);
       this.picked.set(this.step, set);
@@ -151,7 +153,8 @@ class WizardBody extends BaseComponent {
       if (step.kind === 'pick') this.picked.set(this.step, items[this.cursor]);
       else if (step.kind === 'text') this.picked.set(this.step, this.draft);
       else if (step.kind === 'multi') {
-        const set = (this.picked.get(this.step) as Set<number> | undefined) ?? new Set();
+        const raw = this.picked.get(this.step);
+        const set = raw instanceof Set ? raw : new Set<number>();
         this.picked.set(
           this.step,
           [...set].sort((a, b) => a - b).map((i) => items[i]),
