@@ -145,7 +145,7 @@ Built this session (newly committed), modularly per package:
 - Text-tree visual diff (char-level diff of `snapshot()`)
 - `tui.snapshot()` baseline file format + `--update` flag ✅
 - Time-travel: `tui.undo()` / `tui.redo()` for stepping
-- First-class FS + network mock helpers
+- First-class FS + network mock helpers (FsMock) ✅
 - `tui.measure()` perf/budget assertions (`expect(tui).toBeFast()`)
 - Mock plugin registry + factory for kernel tests
 
