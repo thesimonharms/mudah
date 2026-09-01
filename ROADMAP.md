@@ -136,8 +136,8 @@ Built this session (newly committed), modularly per package:
 - `Screen.table` (CRUD over rows) ✅
 - `Screen.pivot` (pivot-table over rows)
 - `Screen.split` (side-by-side master/detail) ✅
-- `Screen.notifications` (toast log center)
-- `Screen.menu` (command palette over a menu)
+- `Screen.notifications` (toast log center) ✅
+- `Screen.menu` (command palette over a menu) ✅
 
 ### `@mudah-cli/testing`
 - Style/ANSI assertions in snapshots (`expect(snap).toHaveColor('green')`) ✅

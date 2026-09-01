@@ -7,6 +7,7 @@ import { HelpFooter } from './chrome.js';
 import { keys } from './keymap.js';
 import { Label, List, Panel, Table, Viewport, type TableColumnDef } from './widgets.js';
 import { Tree, type TreeNodeData } from './extras.js';
+import { FuzzyList } from './fuzzy.js';
 import { Form } from './form.js';
 
 export interface PickerOptions {
@@ -333,6 +334,62 @@ export class SplitScreen extends ScreenHandle<string> {
   }
 }
 
+export interface NotificationEntry {
+  type: 'success' | 'error' | 'info' | 'warn';
+  label: string;
+  message?: string;
+  time?: string;
+}
+
+export interface NotificationsOptions {
+  title?: string;
+  entries: NotificationEntry[];
+}
+
+/** A scrollable notification log center. Escape to dismiss. */
+export class NotificationsScreen extends ScreenHandle<void> {
+  readonly root: Column;
+  readonly list: List;
+
+  constructor(options: NotificationsOptions) {
+    super();
+    const items = options.entries.map((e) => {
+      const icon = e.type === 'success' ? '✓' : e.type === 'error' ? '✗' : e.type === 'warn' ? '⚠' : 'ℹ';
+      return `${icon} ${e.label}`;
+    });
+    this.list = new List(items.length > 0 ? items : ['(no notifications)']);
+    this.root = new Column().add(
+      new Label(options.title ?? 'Notifications'),
+      this.list,
+      new HelpFooter({ ...keys.list, escape: 'quit' }),
+    );
+  }
+}
+
+export interface MenuOptions {
+  title?: string;
+  items: string[];
+}
+
+/** A command palette screen. Type to filter (via FuzzyList), enter to select. */
+export class MenuScreen extends ScreenHandle<string> {
+  readonly root: Column;
+  readonly fuzzy: FuzzyList;
+
+  constructor(options: MenuOptions) {
+    super();
+    this.fuzzy = new FuzzyList(options.items, (item) => {
+      this.value = item;
+      this.done?.();
+    });
+    this.root = new Column().add(
+      new Label(options.title ?? 'Menu'),
+      this.fuzzy,
+      new HelpFooter(keys.list),
+    );
+  }
+}
+
 export const Screen = {
   picker: (options: PickerOptions): PickerScreen => new PickerScreen(options),
   wizard: (options: WizardOptions): WizardScreen => new WizardScreen(options),
@@ -340,5 +397,7 @@ export const Screen = {
   table: (options: TableOptions): TableScreen => new TableScreen(options),
   tree: (options: TreeOptions): TreeScreen => new TreeScreen(options),
   split: (options: MasterDetailOptions): SplitScreen => new SplitScreen(options),
+  notifications: (options: NotificationsOptions): NotificationsScreen => new NotificationsScreen(options),
+  menu: (options: MenuOptions): MenuScreen => new MenuScreen(options),
   dashboard: (options: DashboardOptions): DashboardScreen => new DashboardScreen(options),
 };

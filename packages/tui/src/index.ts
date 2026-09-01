@@ -47,6 +47,8 @@ export {
   TableScreen,
   TreeScreen,
   SplitScreen,
+  NotificationsScreen,
+  MenuScreen,
   type WizardOptions,
   type WizardStep,
   type DashboardOptions,
@@ -54,6 +56,9 @@ export {
   type TableOptions,
   type TreeOptions,
   type MasterDetailOptions,
+  type NotificationsOptions,
+  type NotificationEntry,
+  type MenuOptions,
 } from './screens.js';
 export { Stack } from './stack.js';
 export { Overlay, type PaletteItem } from './overlay.js';

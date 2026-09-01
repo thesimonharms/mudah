@@ -22,6 +22,9 @@ import {
   type TreeNodeData,
   VirtualList,
   MetricGauge,
+  NotificationsScreen,
+  MenuScreen,
+  type NotificationEntry,
 } from '@mudah-cli/tui';
 import { TestTui } from '@mudah-cli/testing';
 
@@ -469,5 +472,40 @@ describe('MetricGauge', () => {
     gauge.setValue(1.5);
     const lines = gauge.render();
     expect(lines[0]).toContain('100%');
+  });
+});
+
+describe('Screen.notifications', () => {
+  it('renders notification entries with type icons', () => {
+    const entries: NotificationEntry[] = [
+      { type: 'success', label: 'Deployed', time: '10:30' },
+      { type: 'error', label: 'Build failed', message: 'exit 1' },
+      { type: 'info', label: 'Syncing' },
+    ];
+    const screen = Screen.notifications({ title: 'Log', entries });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    const snap = tui.snapshot();
+    expect(snap).toContain('Log');
+    expect(snap).toContain('✓ Deployed');
+    expect(snap).toContain('✗ Build failed');
+    expect(snap).toContain('ℹ Syncing');
+  });
+
+  it('shows empty message when no entries', () => {
+    const screen = Screen.notifications({ entries: [] });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    expect(tui.snapshot()).toContain('(no notifications)');
+  });
+});
+
+describe('Screen.menu', () => {
+  it('renders a fuzzy-searchable menu and selects an item', () => {
+    const screen = Screen.menu({ title: 'Commands', items: ['deploy', 'build', 'test'] });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    expect(tui.snapshot()).toContain('Commands');
+    // Type 'b' to filter to 'build', then enter to select.
+    tui.send('b');
+    tui.send('enter');
+    expect(screen.result()).toBe('build');
   });
 });
