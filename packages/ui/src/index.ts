@@ -30,3 +30,16 @@ export {
   type Theme,
   type ThemeColors,
 } from './theme.js';
+export {
+  diffGlyphs,
+  diffGlyphsUnicode,
+  formatDiffLine,
+  type DiffKind,
+  type FormatDiffLineOptions,
+} from './glyphs.js';
+export {
+  PAINT_TOKENS,
+  paintToken,
+  type PaintToken,
+  type PaintTokenOptions,
+} from './tokens.js';
