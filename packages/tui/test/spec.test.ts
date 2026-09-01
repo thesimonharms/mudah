@@ -20,6 +20,8 @@ import {
   TextInput,
   Tree,
   type TreeNodeData,
+  VirtualList,
+  MetricGauge,
 } from '@mudah-cli/tui';
 import { TestTui } from '@mudah-cli/testing';
 
@@ -429,5 +431,43 @@ describe('Screen.split', () => {
     // Enter selects the current item.
     screen.list.confirm();
     expect(screen.result()).toBe('web');
+  });
+});
+
+describe('VirtualList', () => {
+  it('renders only visible items in a large dataset', () => {
+    const items = Array.from({ length: 1000 }, (_, i) => `item-${i}`);
+    const vl = new VirtualList(items, 5, (item, sel) => (sel ? `▸ ${item}` : `  ${item}`));
+    const tui = TestTui.mount(new Column().add(vl), { cols: 40, rows: 5 });
+    const snap = tui.snapshot();
+    expect(snap).toContain('item-0');
+    expect(snap).not.toContain('item-5');
+  });
+
+  it('pages down and selects an item', () => {
+    const items = Array.from({ length: 100 }, (_, i) => `row-${i}`);
+    let picked = -1;
+    const vl = new VirtualList(items, 5, (item, sel) => (sel ? `▸ ${item}` : `  ${item}`), (i) => { picked = i; });
+    const tui = TestTui.mount(new Column().add(vl), { cols: 40, rows: 5 });
+    tui.send('page-down');
+    tui.send('enter');
+    expect(picked).toBe(5);
+  });
+});
+
+describe('MetricGauge', () => {
+  it('renders a bar at 50%', () => {
+    const gauge = new MetricGauge('CPU', 0.5, 20);
+    const lines = gauge.render();
+    expect(lines[0]).toContain('50%');
+    expect(lines[0]).toContain('█'.repeat(10));
+    expect(lines[0]).toContain('░'.repeat(10));
+  });
+
+  it('clamps values to 0..1', () => {
+    const gauge = new MetricGauge('MEM', 1.5, 10);
+    gauge.setValue(1.5);
+    const lines = gauge.render();
+    expect(lines[0]).toContain('100%');
   });
 });

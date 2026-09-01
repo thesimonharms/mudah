@@ -60,5 +60,5 @@ export { Overlay, type PaletteItem } from './overlay.js';
 export { Form } from './form.js';
 export { StatusBar, HelpFooter, Hyperlink } from './chrome.js';
 export { Image, type ImageOptions } from './image.js';
-export { Sparkline, Tree, type TreeNodeData } from './extras.js';
+export { Sparkline, Tree, VirtualList, MetricGauge, type TreeNodeData } from './extras.js';
 export { FuzzyList } from './fuzzy.js';
