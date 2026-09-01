@@ -3,7 +3,8 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from '@mudah-cli/console';
-import { TestApp, TestResult } from '@mudah-cli/testing';
+import { TestApp, TestResult, TestTui } from '@mudah-cli/testing';
+import { Label, Column } from '@mudah-cli/tui';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'app');
@@ -93,5 +94,23 @@ describe('TestApp', () => {
     const result: TestResult = await app.dispatch(['hello', 'x']);
     expect(() => result.exit(1)).toThrow(/Expected exit code 1, got 0/);
     expect(() => result.outContains('not-there')).toThrow(/stdout missing/);
+  });
+});
+
+describe('TestTui.matchSnapshot', () => {
+  it('writes baseline when UPDATE_SNAPSHOT=1', () => {
+    const tui = TestTui.mount(new Column().add(new Label('hello world')));
+    process.env['UPDATE_SNAPSHOT'] = '1';
+    expect(() => tui.matchSnapshot('baseline-write-test')).not.toThrow();
+    delete process.env['UPDATE_SNAPSHOT'];
+  });
+
+  it('passes when baseline matches', () => {
+    const tui = TestTui.mount(new Column().add(new Label('hello world')));
+    // Write first, then match without UPDATE_SNAPSHOT.
+    process.env['UPDATE_SNAPSHOT'] = '1';
+    tui.matchSnapshot('baseline-match-test');
+    delete process.env['UPDATE_SNAPSHOT'];
+    expect(() => tui.matchSnapshot('baseline-match-test')).not.toThrow();
   });
 });
