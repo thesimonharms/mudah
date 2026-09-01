@@ -1,6 +1,7 @@
 import type { ColorLevel } from '@mudah-cli/terminal';
 import { bold, dim, italic, paint, underline } from './colors.js';
 import { renderPanel } from './panel.js';
+import { renderTable, type TableColumn } from './table.js';
 import type { Theme } from './theme.js';
 import { sleekDark } from './theme.js';
 
@@ -31,11 +32,35 @@ function inline(text: string, level: ColorLevel, theme: Theme): string {
   return out;
 }
 
+/** A GFM pipe-table row: `| a | b |`. */
+function isPipeTableRow(line: string): boolean {
+  const t = line.trim();
+  return t.startsWith('|') && t.endsWith('|') && t.length >= 3;
+}
+
+/** Separator under a header: `| --- |` / `| :--- |` / `| ---: |`. */
+function isPipeTableSeparator(line: string): boolean {
+  if (!isPipeTableRow(line)) return false;
+  const cells = splitPipeRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function splitPipeRow(line: string): string[] {
+  const t = line.trim();
+  const inner = t.startsWith('|') ? t.slice(1) : t;
+  const body = inner.endsWith('|') ? inner.slice(0, -1) : inner;
+  return body.split('|').map((cell) => cell.trim());
+}
+
+function alignFromSeparator(cell: string): 'left' | 'right' {
+  return cell.startsWith(':') === false && cell.endsWith(':') ? 'right' : 'left';
+}
+
 /**
  * A lightweight markdown renderer for CLI output: headings, bullets,
- * numbered lists, blockquotes, hr, bold/italic/code, and fenced code blocks
- * rendered as theme-aware panels. Not a full CommonMark parser — just enough
- * to read well in a terminal.
+ * numbered lists, task lists, pipe tables, blockquotes, hr, bold/italic/code,
+ * and fenced code blocks rendered as theme-aware panels. Not a full CommonMark
+ * parser — just enough to read well in a terminal.
  */
 export function renderMarkdown(source: string, options: RenderMarkdownOptions): string {
   const theme = options.theme ?? sleekDark;
@@ -48,7 +73,8 @@ export function renderMarkdown(source: string, options: RenderMarkdownOptions): 
   let fenceLang: string | undefined;
   let fenceInner: string[] = [];
 
-  for (const rawLine of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i]!;
     const line = rawLine.replace(/\s+$/, '');
 
     const fence = FENCE_RE.exec(line);
@@ -69,6 +95,27 @@ export function renderMarkdown(source: string, options: RenderMarkdownOptions): 
     if (inFence) {
       // Preserve code lines verbatim, including blank and indented lines.
       fenceInner.push(rawLine);
+      continue;
+    }
+
+    const next = (lines[i + 1] ?? '').replace(/\s+$/, '');
+    if (isPipeTableRow(line) && isPipeTableSeparator(next)) {
+      const headers = splitPipeRow(line);
+      const aligns = splitPipeRow(next).map(alignFromSeparator);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length) {
+        const body = lines[i]!.replace(/\s+$/, '');
+        if (!isPipeTableRow(body) || isPipeTableSeparator(body)) break;
+        rows.push(splitPipeRow(body));
+        i += 1;
+      }
+      i -= 1;
+      const columns: TableColumn[] = headers.map((header, idx) => ({
+        header,
+        align: aligns[idx] === 'right' ? 'right' : 'left',
+      }));
+      out.push(renderTable(columns, rows, { level, unicode, theme }));
       continue;
     }
 
@@ -96,6 +143,14 @@ export function renderMarkdown(source: string, options: RenderMarkdownOptions): 
     const quote = /^>\s?(.*)$/.exec(line);
     if (quote) {
       out.push(dim(`│ ${inline(quote[1]!, level, theme)}`, level));
+      continue;
+    }
+
+    const task = /^[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+    if (task) {
+      const checked = task[1] !== ' ';
+      const mark = unicode ? (checked ? '☑' : '☐') : checked ? '[x]' : '[ ]';
+      out.push(`  ${mark} ${inline(task[2]!, level, theme)}`);
       continue;
     }
 

@@ -30,6 +30,7 @@ export {
   Column,
   Row,
   Split,
+  Split as ResizableSplit,
   Container,
   clipPad,
   type SplitOptions,
@@ -67,7 +68,10 @@ export { Overlay, type PaletteItem } from './overlay.js';
 export { Form } from './form.js';
 export { StatusBar, HelpFooter, Hyperlink } from './chrome.js';
 export { Image, type ImageOptions } from './image.js';
-export { Sparkline, Tree, VirtualList, MetricGauge, type TreeNodeData } from './extras.js';
+export { Sparkline, Tree, Tree as TreeView, VirtualList, MetricGauge, type TreeNodeData } from './extras.js';
 export { FileBrowser, type FileBrowserOptions, type FileAdapter } from './file-browser.js';
 export { MenuBar, type MenuBarItem, type MenuBarOptions } from './menu-bar.js';
 export { FuzzyList } from './fuzzy.js';
+export { Toolbar, type ToolbarItem, type ToolbarOptions } from './toolbar.js';
+export { Pager, type PagerOptions } from './pager.js';
+export { Chart, type ChartEntry, type ChartKind, type ChartOptions } from './chart.js';
