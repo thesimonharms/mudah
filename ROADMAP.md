@@ -150,22 +150,22 @@ Built this session (newly committed), modularly per package:
 - Mock plugin registry + factory for kernel tests
 
 ### `@mudah-cli/vgpu` (optional)
-- WGSL shader hot-reload (`--watch`)
-- Built-in shader catalog (plasma, metaballs, fire, Voronoi)
-- Audio-reactive shaders synced to `@mudah-cli/audio`
-- Framebuffer capture to PNG
-- Shader parameter sliders rendered as a TUI overlay
-- Shader `import` / include path resolution in WGSL
-- Compute-shader pass for particle physics
+- WGSL shader hot-reload (`--watch`) ✅
+- Built-in shader catalog (plasma, metaballs, fire, Voronoi) ✅
+- Audio-reactive shaders synced to `@mudah-cli/audio` ✅
+- Framebuffer capture to PNG ✅
+- Shader parameter sliders rendered as a TUI overlay ✅
+- Shader `import` / include path resolution in WGSL ✅
+- Compute-shader pass for particle physics ✅
 
 ### `@mudah-cli/audio` (optional)
-- WAV/MP3 decode + streaming playback
-- Tone-sequence DSL (note/duration)
-- Beat/tempo sync (`bpm` clock source)
-- Ducking + channel mixing
-- Beat-grid quantizer
-- Live microphone input + FFT band extraction
-- Audio-reactive event bridge (for vgpu)
+- WAV/MP3 decode + streaming playback ✅
+- Tone-sequence DSL (note/duration) ✅
+- Beat/tempo sync (`bpm` clock source) ✅
+- Ducking + channel mixing ✅
+- Beat-grid quantizer ✅
+- Live microphone input + FFT band extraction ✅
+- Audio-reactive event bridge (for vgpu) ✅
 
 ## Cross-cutting
 - Plugin marketplace discovery (`mudah plugins list/update`)
