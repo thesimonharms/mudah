@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run } from '@mudah-cli/mudah';
-import { sniffFormat, normalizeFormat, targetFormats } from '../src/image/formats.js';
+import { sniffFormat, normalizeFormat, targetFormats, type ImageFormat } from '../src/image/formats.js';
 import { Converter, defaultDrivers } from '../src/image/converter.js';
 import { convertBatch, outputPathFor } from '../src/image/pipeline.js';
 
@@ -37,7 +37,7 @@ afterAll(async () => {
   await rm(fixtures, { recursive: true, force: true });
 });
 
-async function canEncode(...formats: string[]): Promise<boolean> {
+async function canEncode(...formats: ImageFormat[]): Promise<boolean> {
   const converter = new Converter(defaultDrivers());
   await converter.init();
   const { encode } = converter.capabilities();
