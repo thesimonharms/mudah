@@ -75,9 +75,18 @@ export { FuzzyList } from './fuzzy.js';
 export { Toolbar, type ToolbarItem, type ToolbarOptions } from './toolbar.js';
 export { Pager, type PagerOptions } from './pager.js';
 export { Chart, type ChartEntry, type ChartKind, type ChartOptions } from './chart.js';
-export { fromLayout, type LayoutNode } from './dsl.js';
-export { VideoFrames } from './video.js';
+export { fromLayout, parseLayout, compileLayout, LayoutSyntaxError, type LayoutNode } from './dsl.js';
+export { VideoFrames, VideoPlayer, type VideoPlayerOptions, type RgbaFrame } from './video.js';
 export { LayoutDebugger } from './debug-overlay.js';
-export { renderWidgetToText } from './wasi.js';
-export { SessionRecorder, type ReplayHandle, type SessionAction } from './record.js';
+export { renderWidgetToText, renderWidgetTree } from './wasi.js';
+export {
+  SessionRecorder,
+  parseSessionTape,
+  replayTape,
+  replayTapeAsync,
+  isSessionAction,
+  type ReplayHandle,
+  type SessionAction,
+  type SessionTape,
+} from './record.js';
 export { widgetReference, widgetReferenceMarkdown, type WidgetRef } from './reference.js';

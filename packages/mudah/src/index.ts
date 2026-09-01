@@ -1,6 +1,16 @@
 export { run, type RunOptions } from './run.js';
-export { createWatcher, watchPlugins, type WatcherOptions } from './watcher.js';
-export { handleLspMessage, initializeResult, completionItems, type LspMessage } from './lsp.js';
+export { createWatcher, watchPlugins, hotReloadPlugins, pathsFromGlob, type WatcherOptions } from './watcher.js';
+export {
+  handleLspMessage,
+  initializeResult,
+  completionItems,
+  hoverContents,
+  encodeLspFrame,
+  decodeLspFrames,
+  type LspMessage,
+} from './lsp.js';
+export { enterSandbox, withSandbox, type SandboxSession } from './sandbox.js';
+export { buildDeployPlan, executeDeployPlan, parseHosts, type DeployPlan, type HostProbe } from './deploy.js';
 export { normalizeAutocompleteShell, renderAutocompleteScript, type AutocompleteShell } from './autocomplete.js';
 
 // App-facing re-exports: `import { Command } from '@mudah-cli/mudah'` is all users need.

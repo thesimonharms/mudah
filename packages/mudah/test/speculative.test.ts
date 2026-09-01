@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleLspMessage, run, watchPlugins } from '@mudah-cli/mudah';
+import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, withSandbox, buildDeployPlan, executeDeployPlan } from '@mudah-cli/mudah';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'speculative');
@@ -95,6 +95,29 @@ describe('lsp initialize', () => {
     const result = await invoke(['lsp']);
     expect(result.code).toBe(0);
     expect(result.out).toContain('mudah-lsp ready');
+  });
+
+  it('hovers mudah.json keys and frames JSON-RPC', () => {
+    handleLspMessage({
+      jsonrpc: '2.0',
+      method: 'textDocument/didOpen',
+      params: { textDocument: { uri: 'file:///app/mudah.json', text: '{ "name": "demo" }\n' } },
+    });
+    const hover = handleLspMessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'textDocument/hover',
+      params: { textDocument: { uri: 'file:///app/mudah.json' }, position: { line: 0, character: 4 } },
+    });
+    const contents = (hover?.result as { contents?: { value?: string } }).contents;
+    expect(contents?.value).toContain('**name**');
+    const framed = encodeLspFrame({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+    expect(framed).toContain('Content-Length:');
+    const decoded = decodeLspFrames(framed);
+    expect(decoded.messages[0]?.method).toBe('initialize');
+    const body = '{"jsonrpc":"2.0","id":9,"method":"shutdown"}';
+    const lf = decodeLspFrames(`Content-Length: ${Buffer.byteLength(body)}\n\n${body}`);
+    expect(lf.messages[0]?.method).toBe('shutdown');
   });
 });
 
@@ -188,5 +211,46 @@ describe('watchPlugins', () => {
     const stop = watchPlugins(appDir, () => undefined, { debounceMs: 20 });
     expect(typeof stop).toBe('function');
     stop();
+  });
+});
+
+describe('production speculative helpers', () => {
+  it('plugins:watch --once reloads and exits', async () => {
+    const result = await invoke(['plugins:watch', '--once']);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('Plugins reloaded');
+  });
+
+  it('storybook can filter a widget', async () => {
+    const result = await invoke(['storybook', 'label', '--cols=20', '--rows=4']);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('Label story');
+    expect(result.out).not.toContain('Toolbar story');
+  });
+
+  it('blocks fetch inside withSandbox and restores cwd', async () => {
+    const here = process.cwd();
+    let sawSandbox = false;
+    await withSandbox({ cwd: appDir }, async () => {
+      expect(process.env['MUDAH_SANDBOX']).toBe('1');
+      sawSandbox = true;
+      await expect(fetch('https://example.invalid')).rejects.toThrow(/network is disabled/);
+    });
+    expect(sawSandbox).toBe(true);
+    expect(process.cwd()).toBe(here);
+    expect(process.env['MUDAH_SANDBOX']).not.toBe('1');
+  });
+
+  it('executes a rolling deploy plan host by host', async () => {
+    const plan = buildDeployPlan(['a.example', 'b.example'], true, false);
+    expect(plan.mode).toBe('rolling');
+    const seen: string[] = [];
+    const { results } = await executeDeployPlan(plan, async (host) => {
+      seen.push(host);
+      return { ok: host === 'a.example', latencyMs: 1, detail: 'probe' };
+    });
+    expect(seen).toEqual(['a.example', 'b.example']);
+    expect(results[0]?.ok).toBe(true);
+    expect(results[1]?.ok).toBe(false);
   });
 });

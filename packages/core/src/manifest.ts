@@ -27,6 +27,13 @@ export interface MudahManifest {
   providers?: string[];
   /** Opt in to boot/perf telemetry (disabled by default). */
   telemetry?: boolean;
+  /** Declarative `mudah watch` defaults. */
+  watch?: {
+    command?: string;
+    glob?: string;
+    ignore?: string[];
+    debounceMs?: number;
+  };
 }
 
 export class MudahManifestError extends Error {
@@ -74,5 +81,14 @@ export function loadManifest(basePath: string): MudahManifest {
   if (Array.isArray(data.commands)) manifest.commands = data.commands.filter((c): c is string => typeof c === 'string');
   if (Array.isArray(data.providers)) manifest.providers = data.providers.filter((p): p is string => typeof p === 'string');
   if (data.telemetry === true) manifest.telemetry = true;
+  if (data.watch && typeof data.watch === 'object') {
+    const watch = data.watch as Record<string, unknown>;
+    manifest.watch = {
+      command: typeof watch.command === 'string' ? watch.command : undefined,
+      glob: typeof watch.glob === 'string' ? watch.glob : undefined,
+      ignore: Array.isArray(watch.ignore) ? watch.ignore.filter((v): v is string => typeof v === 'string') : undefined,
+      debounceMs: typeof watch.debounceMs === 'number' ? watch.debounceMs : undefined,
+    };
+  }
   return manifest;
 }

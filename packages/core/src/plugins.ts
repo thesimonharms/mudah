@@ -59,6 +59,11 @@ export interface PluginDiscoveryOptions {
   coreVersion?: string;
   /** Runtime feature flags the host currently provides. */
   features?: readonly string[];
+  /**
+   * Bust the ESM import cache so hot-reload can re-evaluate plugin modules.
+   * `true` uses `Date.now()`; a string/number is appended as `?mudahReload=`.
+   */
+  bustCache?: boolean | string | number;
 }
 
 interface PackageJson {
@@ -193,7 +198,7 @@ export async function loadPlugin(
   const resolve = options.resolve ?? defaultResolve;
   const importModule = options.importModule ?? defaultImport;
 
-  const url = await resolve(name, basePath);
+  const url = cacheBust(await resolve(name, basePath), options.bustCache);
   const mod = await importModule(url);
 
   const providers: ProviderClass[] = [];
@@ -384,4 +389,11 @@ function defaultResolve(specifier: string, from: string): string {
 
 function defaultImport(url: string): Promise<Record<string, unknown>> {
   return import(/* @vite-ignore */ url) as Promise<Record<string, unknown>>;
+}
+
+function cacheBust(url: string, token: boolean | string | number | undefined): string {
+  if (token === undefined || token === false) return url;
+  const value = token === true ? Date.now() : token;
+  const joiner = url.includes('?') ? '&' : '?';
+  return `${url}${joiner}mudahReload=${encodeURIComponent(String(value))}`;
 }
