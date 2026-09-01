@@ -12,6 +12,7 @@ let installed = false;
 export function installTsJsResolveHook(): void {
   if (installed) return;
   installed = true;
+  if (typeof registerHooks !== 'function') return;
   registerHooks({
     resolve(specifier, context, nextResolve) {
       try {
