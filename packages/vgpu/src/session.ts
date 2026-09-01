@@ -1,5 +1,6 @@
 import type { OscWriter } from '@mudah-cli/terminal';
 import { FramePresenter, type PresentMode } from './presenter.js';
+import { capturePng } from './png.js';
 
 export type GpuAdapterKind = 'auto' | 'hardware' | 'software' | 'mock';
 
@@ -70,6 +71,7 @@ export class ShaderSession {
   private effect: VgpuEffect;
   private readonly target: VgpuTarget;
   private lastFrame: Uint8Array | undefined;
+  private lastUniforms: Record<string, unknown> = {};
 
   private constructor(
     vgpu: VgpuModule,
@@ -105,7 +107,9 @@ export class ShaderSession {
       stdout: options.stdout,
       mode: options.present,
     });
-    return new ShaderSession(vgpu, gpu, fx, colorTarget, presenter, width, height);
+    const session = new ShaderSession(vgpu, gpu, fx, colorTarget, presenter, width, height);
+    if (options.set !== undefined) session.lastUniforms = { ...options.set };
+    return session;
   }
 
   /** Replace the fragment shader without tearing down the GPU device. */
@@ -114,12 +118,24 @@ export class ShaderSession {
       label: label ?? 'mudah-vgpu',
       set,
     });
+    if (set !== undefined) this.lastUniforms = { ...this.lastUniforms, ...set };
     return this;
   }
 
   set(values: Record<string, unknown>): this {
+    this.lastUniforms = { ...this.lastUniforms, ...values };
     this.effect.set(values);
     return this;
+  }
+
+  /** Merge and write a flat uniform record (audio-reactive helpers use this). */
+  setUniforms(values: Record<string, unknown>): this {
+    return this.set(values);
+  }
+
+  /** Last values passed to `set` / `setUniforms` / `useShader`. */
+  uniforms(): Record<string, unknown> {
+    return { ...this.lastUniforms };
   }
 
   /** Draw one frame and return tightly packed RGBA bytes. */
@@ -150,6 +166,12 @@ export class ShaderSession {
   presentLast(layout: { columns?: number; rows?: number } = {}): void {
     if (this.lastFrame === undefined) return;
     this.presenter.present(this.lastFrame, this.width, this.height, layout);
+  }
+
+  /** Encode the last (or a freshly rendered) RGBA frame as PNG. */
+  async capturePng(): Promise<Uint8Array> {
+    const pixels = this.lastFrame ?? (await this.render());
+    return capturePng(pixels, this.width, this.height);
   }
 
   dispose(): void {
