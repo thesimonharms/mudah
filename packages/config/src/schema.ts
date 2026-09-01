@@ -423,7 +423,9 @@ export function schemaAt(schema: Schema<unknown>, path: string): Schema<unknown>
     if (current === undefined || current.type !== 'object' || !('shape' in current)) {
       return undefined;
     }
-    const shape = (current as { readonly shape: Record<string, Schema<unknown>> }).shape;
+    const shape: Record<string, Schema<unknown>> = (
+      current as { readonly shape: Record<string, Schema<unknown>> }
+    ).shape;
     current = shape[part];
   }
   return current;
