@@ -37,6 +37,13 @@ afterAll(async () => {
   await rm(fixtures, { recursive: true, force: true });
 });
 
+async function canEncode(...formats: string[]): Promise<boolean> {
+  const converter = new Converter(defaultDrivers());
+  await converter.init();
+  const { encode } = converter.capabilities();
+  return formats.every((format) => encode.has(format));
+}
+
 describe('format sniffing', () => {
   it('identifies png/jpeg/webp/gif from magic bytes', () => {
     expect(sniffFormat(PNG_1x1)?.format).toBe('png');
@@ -73,6 +80,7 @@ describe('conversion engine', () => {
   it('plans direct routes preferring the bun driver when present', async () => {
     const converter = new Converter(defaultDrivers());
     await converter.init();
+    if (!converter.capabilities().encode.has('webp')) return;
     const plan = converter.plan('png', 'webp');
     expect(plan).toBeDefined();
     expect(plan!.via).toBeUndefined();
@@ -107,6 +115,7 @@ describe('conversion engine', () => {
   });
 
   it('converts png → jpeg/webp/png with real bytes', async () => {
+    if (!(await canEncode('jpeg', 'webp'))) return;
     const results = await convertBatch([join(work, 'pixel.png')], { to: 'jpeg', suffix: '-t' });
     expect(results[0]!.ok).toBe(true);
     const out = results[0]!.output;
@@ -155,6 +164,7 @@ describe('CLI end-to-end', () => {
   }
 
   it('converts via the CLI and reports success', async () => {
+    if (!(await canEncode('webp'))) return;
     const s = streams();
     const code = await run({
       argv: ['convert', join(work, 'pixel.png'), '--to=webp', '--suffix=-cli'],
@@ -182,6 +192,7 @@ describe('CLI end-to-end', () => {
   });
 
   it('emits a JSON report with --json', async () => {
+    if (!(await canEncode('jpeg'))) return;
     const s = streams();
     const code = await run({
       argv: ['convert', join(work, 'pixel.png'), '--to=jpeg', '--suffix=-js', '--json'],
