@@ -1,24 +1,25 @@
-import { join } from 'node:path';
 import { Command, type ConsoleKernel } from '@mudah-cli/console';
-import { createWatcher } from '../watcher.js';
+import { createWatcher, pathsFromGlob } from '../watcher.js';
 
 /**
- * Built-in `watch` command: thin `dev` wrapper with an optional glob.
- * Non-TTY or `--once` runs the command once and exits (tests / CI).
+ * Built-in `watch` command: re-run a command when files change.
+ * Reads `mudah.json` `watch` defaults when args are omitted.
  */
 export default class WatchCommand extends Command {
-  signature = 'watch {command?} {glob?} [--once]';
-  description = 'Watch files and re-run a command (dev wrapper)';
+  signature = 'watch {command?} {glob?} [--once] [--debounce=]';
+  description = 'Watch files and re-run a command';
 
   constructor(private readonly kernel: ConsoleKernel) {
     super();
   }
 
   async handle(): Promise<number> {
-    const target = this.arg('command');
-    const glob = this.arg('glob') ?? 'src/**';
+    const configured = this.app.manifest.watch;
+    const target = this.arg('command') ?? configured?.command;
+    const glob = this.arg('glob') ?? configured?.glob ?? 'src/**';
     const once = this.option('once') === true;
-    this.output.info(`watch glob=${glob}`);
+    const debounce = Number(this.option('debounce') ?? configured?.debounceMs ?? 150) || 150;
+    this.output.info(`watch glob=${glob} debounce=${debounce}ms`);
 
     if (target === undefined) {
       this.output.muted('Pass a command to re-run, e.g. watch doctor src/**');
@@ -45,10 +46,15 @@ export default class WatchCommand extends Command {
     }
 
     const base = this.app.basePath;
-    const stop = createWatcher([join(base, glob), join(base, 'src'), join(base, 'config'), join(base, 'mudah.json')], () => {
-      this.output.muted('change detected — re-running…');
-      void runOnce();
-    });
+    const stop = createWatcher(
+      pathsFromGlob(base, glob),
+      (filename) => {
+        if (filename) process.env['MUDAH_WATCH_FILE'] = filename;
+        this.output.muted('change detected — re-running…');
+        void runOnce();
+      },
+      { debounceMs: debounce, ignore: configured?.ignore },
+    );
     this.output.muted('watching for changes (ctrl+c to stop)');
     await new Promise<void>((resolve) => {
       process.once('SIGINT', () => {

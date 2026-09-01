@@ -40,6 +40,7 @@ import WatchCommand from './commands/watch.command.js';
 import DocsWidgetsCommand from './commands/docs.widgets.command.js';
 import PluginsListCommand from './commands/plugins.list.command.js';
 import PluginsUpdateCommand from './commands/plugins.update.command.js';
+import PluginsWatchCommand from './commands/plugins.watch.command.js';
 import MigrateCommand from './commands/migrate.command.js';
 import AuditCommand from './commands/audit.command.js';
 import CacheCommand from './commands/cache.command.js';
@@ -719,6 +720,7 @@ function registerFrameworkBuiltIns(kernel: ConsoleKernel, seen: Set<string>): vo
   });
   register({ default: PluginsListCommand });
   register({ default: PluginsUpdateCommand });
+  register({ default: PluginsWatchCommand });
   register({ default: MigrateCommand });
   register({ default: AuditCommand });
   register({ default: CacheCommand });

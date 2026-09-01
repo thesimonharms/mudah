@@ -23,10 +23,15 @@ async function walkTests(dir: string, pattern: string | undefined, acc: string[]
   }
 }
 
-function runVitest(cwd: string, pattern: string | undefined): Promise<number | undefined> {
+function runVitest(
+  cwd: string,
+  pattern: string | undefined,
+  flags: { watch: boolean; coverage: boolean },
+): Promise<number | undefined> {
   return new Promise((resolve) => {
-    const args = ['vitest', 'run'];
+    const args = ['vitest', flags.watch ? 'watch' : 'run'];
     if (pattern !== undefined) args.push(pattern);
+    if (flags.coverage) args.push('--coverage');
     const child = spawn('npx', ['--no-install', ...args], {
       cwd,
       stdio: 'inherit',
@@ -38,29 +43,34 @@ function runVitest(cwd: string, pattern: string | undefined): Promise<number | u
 }
 
 /**
- * Built-in `test` command: spawn `npx vitest run` when available,
- * otherwise list matching `*.test.ts` files. Nested vitest runs list only.
+ * Built-in `test` command: spawn vitest, or list matching `*.test.ts` files.
  */
 export default class TestCommand extends Command {
-  signature = 'test {pattern?}';
+  signature = 'test {pattern?} [--watch] [--coverage] [--fail-empty]';
   description = 'Discover *.test.ts files and run vitest';
+  static exitCodes = { 1: 'No tests found (--fail-empty) or vitest failed' };
 
   async handle(): Promise<number> {
     const pattern = this.arg('pattern');
     const base = this.app.basePath;
-
-    if (process.env['VITEST'] === undefined) {
-      const code = await runVitest(base, pattern);
-      if (code !== undefined) return code;
-    }
-
     const files: string[] = [];
     await walkTests(base, pattern, files);
     this.output.section('Tests');
+    this.output.keyValue('files', String(files.length));
+
     if (files.length === 0) {
       this.output.warn('No *.test.ts files found.');
-      return 0;
+      return this.option('fail-empty') === true ? 1 : 0;
     }
+
+    if (process.env['VITEST'] === undefined) {
+      const code = await runVitest(base, pattern, {
+        watch: this.option('watch') === true,
+        coverage: this.option('coverage') === true,
+      });
+      if (code !== undefined) return code;
+    }
+
     for (const file of files) {
       this.output.raw(`  ${relative(base, file)}\n`);
     }

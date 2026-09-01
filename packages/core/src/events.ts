@@ -8,6 +8,7 @@ export interface AppEvents {
   'command.after': { command: string; exitCode: number; durationMs: number };
   'command.error': { command: string; error: unknown };
   'config.changed': { key: string };
+  'plugins.reloaded': { app: Application; plugins: import('./plugins.js').PluginInfo[] };
 }
 
 export type EventHandler<E> = (payload: E) => void | Promise<void>;

@@ -372,6 +372,38 @@ export class Application extends Container {
   }
 
   /**
+   * Re-scan plugins, cache-bust their modules, register any new providers,
+   * and boot providers that arrived after the original `boot()`. Emits
+   * `plugins.reloaded`.
+   */
+  async reloadPlugins(options: PluginDiscoveryOptions = {}): Promise<PluginInfo[]> {
+    const plugins = await this.discoverPlugins({
+      ...options,
+      bustCache: options.bustCache ?? true,
+    });
+    if (this.booted) await this.bootPendingProviders();
+    await this.events().emit('plugins.reloaded', { app: this, plugins });
+    return plugins;
+  }
+
+  /** Register+boot providers added after the initial two-phase boot. */
+  private async bootPendingProviders(): Promise<void> {
+    const pending = this.providers.filter(
+      (Provider) => !this.bootedInstances.some((instance) => instance.constructor === Provider),
+    );
+    const started: ServiceProvider[] = [];
+    for (const Provider of pending) {
+      const instance = new Provider(this);
+      this.bootedInstances.push(instance);
+      started.push(instance);
+      await instance.register?.();
+    }
+    for (const instance of started) {
+      await instance.boot?.();
+    }
+  }
+
+  /**
    * Discover command modules in the given directory (sorted). A command
    * module is any file whose default export is a class with `handle`.
    */
