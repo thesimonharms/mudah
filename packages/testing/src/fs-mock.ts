@@ -100,8 +100,9 @@ export class FsMock {
     const parts = path.split('/').filter(Boolean);
     let node = this.root;
     for (const part of parts) {
-      node = node.children?.get(part);
-      if (!node) return undefined;
+      const next = node.children?.get(part);
+      if (!next) return undefined;
+      node = next;
     }
     return node;
   }

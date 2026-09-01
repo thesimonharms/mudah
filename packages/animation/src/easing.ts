@@ -33,7 +33,7 @@ export const elastic: EasingFn = (t) => {
 };
 
 /** Lookup easing functions by name. */
-export const easings: Record<string, EasingFn> = { linear, easeIn, easeOut, easeInOut, bounce, elastic };
+export const easings = { linear, easeIn, easeOut, easeInOut, bounce, elastic } as const;
 
 /**
  * Interpolate between two values over time `t` (0..1) using an easing function.
