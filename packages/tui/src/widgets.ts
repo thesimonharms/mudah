@@ -83,6 +83,10 @@ export class Table extends BaseComponent {
     );
   }
 
+  inspect(): { role: string; name?: string; value?: unknown } {
+    return { role: 'table', name: this.selected?.[0], value: this.selectedIndex };
+  }
+
   render(): string[] {
     const start = this.scrollTop;
     const visible = this.rows.slice(start, start + this.budget);

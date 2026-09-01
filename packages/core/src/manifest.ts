@@ -25,6 +25,8 @@ export interface MudahManifest {
   commands?: string[];
   /** Extra provider file paths (relative to the app root) beyond src/providers. */
   providers?: string[];
+  /** Opt in to boot/perf telemetry (disabled by default). */
+  telemetry?: boolean;
 }
 
 export class MudahManifestError extends Error {
@@ -71,5 +73,6 @@ export function loadManifest(basePath: string): MudahManifest {
   if (data.ui && typeof data.ui === 'object') manifest.ui = data.ui as MudahUiOptions;
   if (Array.isArray(data.commands)) manifest.commands = data.commands.filter((c): c is string => typeof c === 'string');
   if (Array.isArray(data.providers)) manifest.providers = data.providers.filter((p): p is string => typeof p === 'string');
+  if (data.telemetry === true) manifest.telemetry = true;
   return manifest;
 }

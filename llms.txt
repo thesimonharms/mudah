@@ -13,6 +13,9 @@ Commands: one file, default export, `signature` string `{arg?} [--flag]`. Groups
 Prompts: `this.select` / `this.confirm` / `this.password`. Not a Program.
 Tests: `TestApp.create({ cwd }).dispatch(['cmd']).exit(0).outContains('...')`.
 
+Built-ins include `make`, `doctor`, `tutorial`, `docs:widgets`, `lsp`, `replay`, `sandbox`,
+`test`, `storybook`, `deploy`, `watch` (dev wrapper), `dev`.
+
 ## TUI: one way
 
 Depth: flags/JSON → Command. One question → prompt. Full-screen → Program.
@@ -39,9 +42,29 @@ Layout: `Column` (vertical), `Row` (horizontal), `Split` (two panes, drag bar). 
 Label, Panel, List (click + arrows), MultiList, Table, Viewport, TextInput (caret, paste).
 Chrome: StatusBar, HelpFooter, Hyperlink (OSC 8), Image (Kitty or half-blocks).
 Nav: Stack (push/pop), Overlay (modal, toast, ctrl+k palette).
-Extra: Sparkline, Tree, FuzzyList.
+Extra: Sparkline, Tree, FuzzyList, Toolbar, Pager.
 
 Leftover space goes to children that implement `resize` (Viewport, Table, Panel, nested layouts).
+
+### Constructor options
+
+| Widget | options |
+| --- | --- |
+| List | `items: string[]`, `onSelect?(index)` |
+| Table | `columns: {header, align?, width?}[]`, `rows: string[][]`, `onSelect?(index, row)`, `viewportHeight?` |
+| TextInput | `onSubmit?(value)`, then `width`, `value`, `cursor`, `onChange` |
+| Toolbar | `{ items: {id, label, icon?, shortcut?, onSelect?}[], onSelect?(id), name? }` |
+| Pager | `{ lines: string[], title? }` — `/` search, `g`/`G` jump |
+| Form | `Form.fromSchema(schema, title?)` — schema is `s.object({...})` |
+| Screen.picker | `{ title?, items }` |
+| Screen.wizard | `{ title?, steps: {name, kind: pick\|multi\|text, items?, label?}[] }` |
+| Screen.dashboard | `{ title?, sidebar?, columns, rows, ratio? }` |
+| Screen.form | `{ title?, schema }` |
+| Screen.table | `{ title?, columns, rows, select? }` |
+| Screen.tree | `{ title?, nodes }` |
+| TestTui | `TestTui.mount(root, { cols?, rows?, snapshotDir? })` |
+
+`widgetReference()` instantiates built-ins and returns `{ role, options }[]` from `inspect()`. See `packages/tui/WIDGETS.md`. `docs:widgets` prints it.
 
 ## TestTui
 
@@ -52,13 +75,21 @@ tui.snapshot(); // ASCII
 tui.tree();     // JSON { role, name, value, focused, bounds, children }
 ```
 
+`SessionRecorder` `{ record(action), dump(), replay(tui) }` — no PTY.
+`fromLayout({ type: 'column'|'row'|'label'|'list', children?, text?, items? })`.
+
 No PTY. No Ink. No Blessed. No raw `\x1b[` in app code.
 
 ## Scaffold
 
 `make tui picker|wizard|dashboard`
-`make command name` / `make provider name` / `make config name`
+`make command name` / `make provider name` / `make config name` / `make plugin name`
 `doctor` prints a TUI dump sample.
+`tutorial` — create app, make command, TestTui, doctor (prints when non-TTY / `--plain`).
+
+## VS Code
+
+TextMate grammar for `*.command.ts`: `.vscode/mudah.tmLanguage.json` (highlights `signature`, `description`, `handle`). Contributed from `.vscode/package.json`. `files.associations` in `.vscode/settings.json`.
 
 ## Forbidden
 

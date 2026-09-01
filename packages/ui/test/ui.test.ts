@@ -236,4 +236,40 @@ describe('renderMarkdown', () => {
     expect(out).toContain('plain code');
     expect(out).toContain('+');
   });
+
+  it('renders pipe tables via renderTable', () => {
+    const src = '| Name | Size |\n| --- | ---: |\n| app | 1 |\n| db | 2 |';
+    const out = renderMarkdown(src, { level: 0, unicode: true });
+    expect(out).toContain('Name');
+    expect(out).toContain('Size');
+    expect(out).toContain('app');
+    expect(out).toContain('db');
+    expect(out).toContain('┌');
+    expect(out).toContain('│');
+  });
+
+  it('stops a pipe table at the first non-table line', () => {
+    const src = '| A | B |\n| --- | --- |\n| 1 | 2 |\n\nafter';
+    const out = renderMarkdown(src, { level: 0, unicode: false });
+    expect(out).toContain('| A |');
+    expect(out).toContain('| 1 |');
+    expect(out).toContain('after');
+    expect(out.indexOf('after')).toBeGreaterThan(out.indexOf('1'));
+  });
+
+  it('leaves a lone pipe line as text', () => {
+    expect(md('| not a table |')).toBe('| not a table |');
+  });
+
+  it('renders task-list items as checkboxes', () => {
+    expect(renderMarkdown('- [x] done', { level: 0, unicode: false })).toBe('  [x] done');
+    expect(renderMarkdown('- [ ] todo', { level: 0, unicode: false })).toBe('  [ ] todo');
+    expect(renderMarkdown('* [X] done', { level: 0, unicode: false })).toBe('  [x] done');
+    expect(renderMarkdown('- [x] done', { level: 0, unicode: true })).toContain('☑');
+    expect(renderMarkdown('- [ ] todo', { level: 0, unicode: true })).toContain('☐');
+  });
+
+  it('still renders plain bullets when the task marker is absent', () => {
+    expect(md('- item')).toBe('  • item');
+  });
 });

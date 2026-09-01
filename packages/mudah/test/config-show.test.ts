@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { run, Command } from '@mudah-cli/mudah';
+import { Application, run, s } from '@mudah-cli/mudah';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'config-show');
@@ -154,15 +154,120 @@ describe('config:set', () => {
 
 describe('config:validate', () => {
   it('reports a healthy config when nothing is wrong', async () => {
-    const s = liveStreams();
-    const code = await run({ argv: ['config:validate'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    const streams = liveStreams();
+    const code = await run({ argv: ['config:validate'], cwd: appDir, stdout: streams.stdout, stderr: streams.stderr });
     expect(code).toBe(0);
-    expect(s.text().out).toContain('healthy');
+    expect(streams.text().out).toContain('healthy');
   });
 
   it('scopes validation to a key', async () => {
-    const s = liveStreams();
-    const code = await run({ argv: ['config:validate', 'app'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
+    const streams = liveStreams();
+    const code = await run({ argv: ['config:validate', 'app'], cwd: appDir, stdout: streams.stdout, stderr: streams.stderr });
     expect(code).toBe(0);
+  });
+
+  it('uses a bound schema and reports violations', async () => {
+    const app = new Application(appDir);
+    app.config().bindSchema(s.object({ must: s.string() }));
+    const streams = liveStreams();
+    const code = await run({
+      app,
+      argv: ['config:validate'],
+      cwd: appDir,
+      stdout: streams.stdout,
+      stderr: streams.stderr,
+    });
+    expect(code).toBe(1);
+    expect(streams.text().err).toContain('must');
+    expect(streams.text().err).toContain('is required');
+  });
+});
+
+describe('config:set with schema', () => {
+  it('rejects unknown keys when a schema is bound', async () => {
+    const app = new Application(appDir);
+    app.config().bindSchema(
+      s.object({
+        app: s.object({
+          greeting: s.string(),
+          secret: s.string(),
+          port: s.number(),
+        }),
+      }),
+    );
+    const streams = liveStreams();
+    const code = await run({
+      app,
+      argv: ['config:set', 'nope.x', '1'],
+      cwd: appDir,
+      stdout: streams.stdout,
+      stderr: streams.stderr,
+    });
+    expect(code).toBe(1);
+    expect(streams.text().err).toContain('Unknown config key');
+  });
+
+  it('rejects a schema violation', async () => {
+    const app = new Application(appDir);
+    app.config().bindSchema(s.object({ app: s.object({ port: s.number() }) }));
+    const streams = liveStreams();
+    const code = await run({
+      app,
+      argv: ['config:set', 'app.port', 'nope'],
+      cwd: appDir,
+      stdout: streams.stdout,
+      stderr: streams.stderr,
+    });
+    expect(code).toBe(1);
+    expect(streams.text().err).toContain('Invalid value');
+    expect(streams.text().err).toContain('expected number');
+  });
+});
+
+describe('config:source', () => {
+  it('shows the layer and redacted value for a key', async () => {
+    const streams = liveStreams();
+    const code = await run({
+      argv: ['config:source', 'app.greeting'],
+      cwd: appDir,
+      stdout: streams.stdout,
+      stderr: streams.stderr,
+    });
+    expect(code).toBe(0);
+    expect(streams.text().out).toContain('app.greeting  runtime  hi');
+  });
+
+  it('redacts sensitive values', async () => {
+    const streams = liveStreams();
+    const code = await run({
+      argv: ['config:source', 'app.secret'],
+      cwd: appDir,
+      stdout: streams.stdout,
+      stderr: streams.stderr,
+    });
+    expect(code).toBe(0);
+    expect(streams.text().out).toContain('app.secret  runtime  [redacted]');
+    expect(streams.text().out).not.toContain('s3cr3t');
+  });
+
+  it('lists every recorded key when none is given', async () => {
+    const streams = liveStreams();
+    const code = await run({ argv: ['config:source'], cwd: appDir, stdout: streams.stdout, stderr: streams.stderr });
+    expect(code).toBe(0);
+    expect(streams.text().out).toContain('app.greeting  runtime  hi');
+    expect(streams.text().out).toContain('[redacted]');
+    expect(streams.text().out).not.toContain('s3cr3t');
+  });
+
+  it('errors with exit 1 for a missing key', async () => {
+    const streams = liveStreams();
+    const code = await run({
+      argv: ['config:source', 'nope'],
+      cwd: appDir,
+      stdout: streams.stdout,
+      stderr: streams.stderr,
+    });
+    expect(code).toBe(1);
+    expect(streams.text().err).toContain('No configuration');
   });
 });

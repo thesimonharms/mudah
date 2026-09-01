@@ -4,6 +4,7 @@ import {
   ConfigValidationError,
   defineConfig,
   s,
+  schemaAt,
   validateSchema,
   assertSchema,
 } from '@mudah-cli/config';
@@ -207,6 +208,16 @@ describe('defineConfig', () => {
   });
 });
 
+describe('schemaAt', () => {
+  it('walks a dotted path on an object schema', () => {
+    const schema = s.object({ app: s.object({ port: s.number() }) });
+    expect(schemaAt(schema, '')).toBe(schema);
+    expect(schemaAt(schema, 'app.port')?.type).toBe('number');
+    expect(schemaAt(schema, 'app.missing')).toBeUndefined();
+    expect(schemaAt(schema, 'nope')).toBeUndefined();
+  });
+});
+
 describe('ConfigRepository.validate', () => {
   const schema = s.object({ host: s.string(), pool: s.number().default(5) });
 
@@ -234,5 +245,14 @@ describe('ConfigRepository.validate', () => {
     config.set('name', 1);
     const result = config.validate('', s.object({ name: s.string() }));
     expect(result.issues).toEqual([{ path: 'name', message: 'expected string, got number' }]);
+  });
+
+  it('bindSchema exposes the schema and schemaAt lookup', () => {
+    const config = new ConfigRepository();
+    const schema = s.object({ app: s.object({ port: s.number() }) });
+    config.bindSchema(schema);
+    expect(config.schema).toBe(schema);
+    expect(config.schemaAt('app.port')?.type).toBe('number');
+    expect(config.schemaAt('nope')).toBeUndefined();
   });
 });

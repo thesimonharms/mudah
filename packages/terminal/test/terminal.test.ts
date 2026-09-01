@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { detectCapabilities, guardedOsc, KeyParser, osc, parseKeys, enableKittyKeyboard, disableKittyKeyboard } from '@mudah-cli/terminal';
+import {
+  detectCapabilities,
+  guardedOsc,
+  KeyParser,
+  osc,
+  parseKeys,
+  normalizeKey,
+  normalizeKeys,
+  sniffPalette,
+  pickColorFallback,
+  enableKittyKeyboard,
+  disableKittyKeyboard,
+} from '@mudah-cli/terminal';
 
 describe('detectCapabilities', () => {
   it('detects Ghostty with truecolor and OSC 9 notifications', () => {
@@ -120,6 +132,83 @@ describe('parseKeys', () => {
 
   it('parses mixed input', () => {
     expect(names('a\x1b[Bb')).toEqual(['a', 'down', 'b']);
+  });
+
+  it('emits a single paste event for a 200~ / 201~ chunk', () => {
+    const events = parseKeys('\x1b[200~hello\r\nworld\x1b[201~');
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ name: 'paste', paste: 'hello\r\nworld' });
+  });
+
+  it('keeps keys inside a paste payload as paste text, not events', () => {
+    const events = parseKeys('\x1b[200~hi\x1b[A\x1b[201~');
+    expect(events).toEqual([{ name: 'paste', paste: 'hi\x1b[A', kind: 'press' }]);
+  });
+});
+
+describe('normalizeKey', () => {
+  it('strips Kitty CSI-u modifiers into a shared shape', () => {
+    const [event] = parseKeys('\x1b[97;3u');
+    expect(event?.name).toBe('alt+a');
+    expect(normalizeKey(event!)).toEqual({
+      name: 'a',
+      shift: false,
+      alt: true,
+      ctrl: false,
+      meta: false,
+      ch: 'a',
+    });
+  });
+
+  it('parses legacy ESC+letter into the same shape as Kitty alt', () => {
+    const kitty = normalizeKey(parseKeys('\x1b[97;3u')[0]!);
+    const legacy = parseKeys('\x1ba', { normalize: true });
+    expect(legacy).toHaveLength(1);
+    expect(legacy[0]?.name).toBe('alt+a');
+    expect(legacy[0]?.normalized).toEqual(kitty);
+
+    const merged = normalizeKeys(parseKeys('\x1ba'));
+    expect(merged).toEqual([kitty]);
+  });
+
+  it('normalizes ctrl+c and shift-tab', () => {
+    expect(normalizeKey(parseKeys('\x03')[0]!)).toEqual({
+      name: 'c',
+      shift: false,
+      alt: false,
+      ctrl: true,
+      meta: false,
+    });
+    expect(normalizeKey(parseKeys('\x1b[Z')[0]!)).toEqual({
+      name: 'tab',
+      shift: true,
+      alt: false,
+      ctrl: false,
+      meta: false,
+    });
+  });
+
+  it('does not change default parseKeys output for ESC+letter', () => {
+    expect(parseKeys('\x1ba').map((k) => k.name)).toEqual(['escape', 'a']);
+  });
+});
+
+describe('sniffPalette / pickColorFallback', () => {
+  it('sniffs truecolor, 256, 16, and none', () => {
+    expect(sniffPalette({ env: { COLORTERM: 'truecolor' }, isTty: true })).toBe(24);
+    expect(sniffPalette({ colorterm: 'yes', env: {}, isTty: true })).toBe(24);
+    expect(sniffPalette({ env: { TERM: 'xterm-256color' }, isTty: true })).toBe(8);
+    expect(sniffPalette({ env: { TERM: 'xterm' }, isTty: true })).toBe(1);
+    expect(sniffPalette({ env: { NO_COLOR: '1', TERM: 'xterm-256color' }, isTty: true })).toBe(0);
+    expect(sniffPalette({ forceColor: '3', env: {}, isTty: false })).toBe(24);
+  });
+
+  it('picks the lower of desired and available', () => {
+    expect(pickColorFallback(24, 8)).toBe(8);
+    expect(pickColorFallback(8, 24)).toBe(8);
+    expect(pickColorFallback(24, 24)).toBe(24);
+    expect(pickColorFallback(1, 0)).toBe(0);
+    expect(pickColorFallback(8, 1)).toBe(1);
   });
 });
 
@@ -245,6 +334,33 @@ describe('osc', () => {
     guarded.commandEnd(1);
     guarded.workingDir('/x');
     expect(buffer.value).toBe('');
+  });
+
+  it('emits OSC 9;1 progress and OSC 9;2 bell', () => {
+    const { stream, buffer } = capture();
+    osc.progress(stream, 50);
+    osc.progress(stream, 150);
+    osc.progress(stream, -4);
+    osc.bell(stream);
+    expect(buffer.value).toContain('\x1b]9;1;50\x07');
+    expect(buffer.value).toContain('\x1b]9;1;100\x07');
+    expect(buffer.value).toContain('\x1b]9;1;0\x07');
+    expect(buffer.value).toContain('\x1b]9;2\x07');
+    expect(buffer.value).not.toContain('\x1f');
+  });
+
+  it('guardedOsc always emits progress and bell', () => {
+    const { stream, buffer } = capture();
+    const guarded = guardedOsc(stream, { osc9: false, osc133: false, osc7: false });
+    guarded.progress(25);
+    guarded.bell();
+    expect(buffer.value).toBe('\x1b]9;1;25\x07\x1b]9;2\x07');
+  });
+
+  it('keeps osc.notify on OSC 9 with the unit separator', () => {
+    const { stream, buffer } = capture();
+    osc.notify(stream, 'Title', 'Done');
+    expect(buffer.value).toContain('\x1b]9;Title\x1fDone\x07');
   });
 
   it('guardedOsc emits workingDir when osc7 is set', () => {

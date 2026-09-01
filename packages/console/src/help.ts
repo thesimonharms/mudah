@@ -34,6 +34,10 @@ export function formatCommandRow(entry: CommandEntry, width: number): string {
 /** Render the full command list, with grouped commands under headers. */
 export function renderCommandList(appName: string, version: string, entries: CommandEntry[], lines: string[]): void {
   lines.push(`${appName} v${version}`, '');
+  lines.push('NAME');
+  lines.push(`    ${appName} — command-line interface`, '');
+  lines.push('SYNOPSIS');
+  lines.push(`    ${appName} <command> [options]`, '');
   if (entries.length === 0) {
     lines.push('No commands registered.');
     return;
@@ -78,8 +82,13 @@ function groupEntries(entries: CommandEntry[]): Array<[string, CommandEntry[]]> 
 
 /** Render single-command help. */
 export function renderCommandHelp(appName: string, entry: CommandEntry, lines: string[]): void {
+  lines.push('NAME');
+  lines.push(`    ${entry.name}${entry.description ? ` — ${entry.description}` : ''}`, '');
+  lines.push('SYNOPSIS');
+  lines.push(`    ${appName} ${formatUsage(entry)}`, '');
   lines.push(`Usage: ${appName} ${formatUsage(entry)}`, '');
   if (entry.description) {
+    lines.push('DESCRIPTION');
     lines.push('Description');
     lines.push(`  ${entry.description}`, '');
   }
@@ -130,5 +139,10 @@ export function renderCommandHelp(appName: string, entry: CommandEntry, lines: s
       lines.push(`  ${flag}  ${note}`.trimEnd());
     }
     lines.push('  --help  Show this help');
+  }
+  const seeAlso = [...(entry.aliases ?? [])];
+  if (seeAlso.length > 0) {
+    lines.push('', 'SEE ALSO');
+    lines.push(`    ${seeAlso.join(', ')}`);
   }
 }

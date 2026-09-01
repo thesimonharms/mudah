@@ -6,9 +6,22 @@ import { ConfigRepository } from '@mudah-cli/config';
 import { Container, isClassLike, type Abstract, type Constructor } from '@mudah-cli/container';
 import { EventBus } from './events.js';
 import { loadManifest, type MudahManifest } from './manifest.js';
-import { discoverPlugins, type PluginDiscoveryOptions, type PluginInfo } from './plugins.js';
+import { CORE_VERSION, discoverPlugins, gatePlugin, type PluginDiscoveryOptions, type PluginInfo } from './plugins.js';
 import { ServiceProvider } from './service-provider.js';
 import { installTsJsResolveHook } from './ts-js-hook.js';
+
+export interface IoStreams {
+  stdin?: { read?: unknown };
+  stdout?: { write(data: string): unknown };
+  stderr?: { write(data: string): unknown };
+}
+
+export interface ProviderHealth {
+  readonly provider: string;
+  readonly status: 'ok' | 'error' | 'skipped';
+  readonly latencyMs: number;
+  readonly detail?: string;
+}
 
 export type ProviderClass = new (app: Application) => ServiceProvider;
 
@@ -17,8 +30,8 @@ export interface LazyProviderOptions {
   commands?: string[];
   /** Boot this provider when one of these bindings is resolved. */
   bindings?: readonly Abstract[];
-  /** Boot this provider when the predicate returns true (checked on demand). */
-  bootWhen?: (app: Application) => boolean;
+  /** Boot this provider when the predicate returns true (checked on demand). May be async. */
+  bootWhen?: (app: Application) => boolean | Promise<boolean>;
 }
 
 interface LazyRegistration {
@@ -88,6 +101,10 @@ export class Application extends Container {
   private readonly bootedLazy = new Set<ProviderClass>();
   private readonly bootedInstances: ServiceProvider[] = [];
   private booted = false;
+  private io: IoStreams = {};
+  private discoveredPlugins: PluginInfo[] = [];
+  private pluginGateWarnings: string[] = [];
+  private readonly registeredPluginProviders = new Set<ProviderClass>();
 
   constructor(basePath: string = process.cwd(), manifest?: MudahManifest) {
     super();
@@ -105,6 +122,21 @@ export class Application extends Container {
 
   events(): EventBus {
     return this.make('events');
+  }
+
+  /** Plugins that passed compatibility gates on the last discovery pass. */
+  plugins(): readonly PluginInfo[] {
+    return this.discoveredPlugins;
+  }
+
+  /** Human-readable reasons plugins were skipped by {@link gatePlugin}. */
+  pluginWarnings(): readonly string[] {
+    return this.pluginGateWarnings;
+  }
+
+  /** Class names of every registered (eager) service provider. */
+  providerNames(): string[] {
+    return this.providers.map((provider) => provider.name);
   }
 
   /** Register a provider that always boots. */
@@ -203,14 +235,61 @@ export class Application extends Container {
     }
   }
 
-  /** Boot lazy providers whose `bootWhen` predicate currently returns true. */
+  /** Boot lazy providers whose `bootWhen` predicate currently returns true (awaited). */
   async evaluateLazy(): Promise<void> {
     for (const entry of this.lazyProviders) {
       if (this.bootedLazy.has(entry.provider)) continue;
-      if (entry.options.bootWhen?.(this)) {
+      const predicate = entry.options.bootWhen;
+      if (!predicate) continue;
+      if (await predicate(this)) {
         await this.bootLazy(entry.provider);
       }
     }
+  }
+
+  /** Redirect command I/O streams for this application (tests, pipes). */
+  redirect(streams: IoStreams): this {
+    this.io = { ...this.io, ...streams };
+    return this;
+  }
+
+  /** Current redirected streams (empty keys fall through to process). */
+  streams(): IoStreams {
+    return this.io;
+  }
+
+  /** Per-provider health: status + latency. Providers may implement `health()`. */
+  async health(): Promise<ProviderHealth[]> {
+    const results: ProviderHealth[] = [];
+    for (const instance of this.bootedInstances) {
+      const name = instance.constructor.name;
+      const t0 = performance.now();
+      try {
+        const custom = await instance.health?.();
+        results.push({
+          provider: name,
+          status: custom?.status ?? 'ok',
+          latencyMs: Math.round(performance.now() - t0),
+          detail: custom?.detail,
+        });
+      } catch (error) {
+        results.push({
+          provider: name,
+          status: 'error',
+          latencyMs: Math.round(performance.now() - t0),
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return results;
+  }
+
+  /** Notify providers of an error (lifecycle hook). */
+  async notifyError(error: unknown): Promise<void> {
+    for (const p of this.bootedInstances) {
+      await p.onError?.(error);
+    }
+    await this.events().emit('command.error', { command: '', error });
   }
 
   private async bootLazy(provider: ProviderClass): Promise<void> {
@@ -229,11 +308,12 @@ export class Application extends Container {
     }
   }
 
-  /** Shut down all booted providers, then emit 'app.shutdown'. */
+  /** Shut down all booted providers, dispose container instances, emit 'app.shutdown'. */
   async shutdown(): Promise<void> {
     for (const p of this.bootedInstances) {
       await p.onShutdown?.();
     }
+    await this.dispose();
     await this.events().emit('app.shutdown', { app: this });
   }
 
@@ -251,6 +331,12 @@ export class Application extends Container {
         }
       }
     }
+    const providersFile = (await this.listFiles(dir)).find((file) => /(?:^|\/)providers\.(ts|mts|js|mjs)$/.test(file));
+    if (providersFile) {
+      const mod = await this.importFile(providersFile);
+      const declared = mod.providers;
+      if (Array.isArray(declared)) this.loadProviders(declared);
+    }
     return this;
   }
 
@@ -263,11 +349,26 @@ export class Application extends Container {
    * must never be able to take down the host app at boot.
    */
   async discoverPlugins(options: PluginDiscoveryOptions = {}): Promise<PluginInfo[]> {
-    const plugins = await discoverPlugins(this.basePath, options);
-    for (const plugin of plugins) {
-      for (const provider of plugin.providers) this.register(provider);
+    const found = await discoverPlugins(this.basePath, options);
+    const coreVersion = options.coreVersion ?? CORE_VERSION;
+    const accepted: PluginInfo[] = [];
+    const warnings: string[] = [];
+    for (const plugin of found) {
+      const gate = gatePlugin(plugin, { coreVersion, features: options.features });
+      if (!gate.ok) {
+        warnings.push(gate.reason ?? `Skipping incompatible plugin ${plugin.name}`);
+        continue;
+      }
+      accepted.push(plugin);
+      for (const provider of plugin.providers) {
+        if (this.registeredPluginProviders.has(provider)) continue;
+        this.registeredPluginProviders.add(provider);
+        this.register(provider);
+      }
     }
-    return plugins;
+    this.discoveredPlugins = accepted;
+    this.pluginGateWarnings = warnings;
+    return accepted;
   }
 
   /**

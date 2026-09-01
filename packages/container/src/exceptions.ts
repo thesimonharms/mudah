@@ -8,9 +8,11 @@ function describe(abstract: Abstract): string {
 
 /** Thrown when an abstract has no binding and is not a constructible class. */
 export class BindingResolutionException extends Error {
-  constructor(abstract: Abstract) {
+  constructor(abstract: Abstract, detail?: string) {
     super(
-      `[container] Unable to resolve "${describe(abstract)}": no binding is registered and it is not a constructible class.`,
+      detail
+        ? `[container] Unable to resolve "${describe(abstract)}": ${detail}`
+        : `[container] Unable to resolve "${describe(abstract)}": no binding is registered and it is not a constructible class.`,
     );
     this.name = 'BindingResolutionException';
   }

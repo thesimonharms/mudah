@@ -14,6 +14,9 @@
   "terminal.integrated.inheritEnv": false,
   "jestrunner.configPath": "jest.unit.config.cjs",
   "compile-hero.disable-compile-files-on-did-save-code": true,
+  "files.associations": {
+    "*.command.ts": "typescript"
+  },
   "tasks": {
     "label": "lint on open",
     "type": "shell",

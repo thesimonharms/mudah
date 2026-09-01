@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Command } from '@mudah-cli/console';
+import { formatGraph, pluginGraph, type PluginInfo } from '@mudah-cli/core';
 import { detectCapabilities } from '@mudah-cli/terminal';
 import { Column, Label, List, dumpTree } from '@mudah-cli/tui';
 
@@ -9,11 +10,29 @@ import { Column, Label, List, dumpTree } from '@mudah-cli/tui';
  * scaffolding, and terminal capabilities.
  */
 export default class DoctorCommand extends Command {
-  signature = 'doctor';
+  signature = 'doctor [--deps] [--a11y-tree]';
   description = 'Check the runtime, app, and terminal setup';
 
   async handle() {
-    const caps = detectCapabilities();
+    const headless = this.app.config().get('mudah.headless') === true;
+    const a11y =
+      this.option('a11y-tree') === true ||
+      this.app.config().get('mudah.a11yTree') === true ||
+      process.env['MUDAH_A11Y_TREE'] === '1';
+
+    const demo = new Column().add(new Label('demo'), new List(['a', 'b']));
+    demo.resize(40, 8);
+    const tree = dumpTree(demo);
+
+    if (a11y) {
+      this.output.raw(JSON.stringify(tree));
+      return;
+    }
+
+    const caps = detectCapabilities({
+      env: process.env,
+      isTty: headless ? false : undefined,
+    });
     this.output.section('Runtime');
 
     const nodeMajor = Number(process.versions.node.split('.')[0]);
@@ -43,6 +62,23 @@ export default class DoctorCommand extends Command {
       this.output.warn('no commands discovered in src/commands');
     }
 
+    if (this.option('deps') === true) {
+      this.output.section('Dependencies');
+      const plugins = (typeof this.app.plugins === 'function' ? this.app.plugins() : []) as PluginInfo[];
+      const extra = typeof this.app.providerNames === 'function' ? this.app.providerNames() : [];
+      this.output.raw(formatGraph(pluginGraph(plugins, extra), 'ascii'));
+    }
+
+    if (typeof this.app.health === 'function') {
+      const report = await this.app.health();
+      if (report.length > 0) {
+        this.output.section('Health');
+        for (const row of report) {
+          this.output.keyValue(row.provider, `${row.status} (${row.latencyMs}ms)`);
+        }
+      }
+    }
+
     this.output.section('Terminal');
     this.output.keyValue('brand', caps.brand);
     this.output.keyValue('color', caps.trueColor ? 'truecolor' : caps.colorLevel === 8 ? '256' : caps.colorLevel === 1 ? '16' : 'off');
@@ -55,9 +91,7 @@ export default class DoctorCommand extends Command {
     this.output.keyValue('keyboard', caps.kittyKeyboard ? 'kitty key-up' : 'legacy');
 
     this.output.section('TUI');
-    const demo = new Column().add(new Label('demo'), new List(['a', 'b']));
-    demo.resize(40, 8);
-    this.output.keyValue('dump', JSON.stringify(dumpTree(demo)));
+    this.output.keyValue('dump', JSON.stringify(tree));
     this.output.hint('Mount a layout and call program.dump() or TestTui.tree()');
 
     this.output.line();
