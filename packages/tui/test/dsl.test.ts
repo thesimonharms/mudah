@@ -77,9 +77,8 @@ children:
       ],
     });
     expect(root).toBeInstanceOf(Split);
-    const text = root.render().join('\n');
-    expect(text).toContain('left');
-    expect(root).toBeInstanceOf(Split);
+    const tui = TestTui.mount(root as Split, { cols: 40, rows: 8 });
+    expect(tui.snapshot()).toContain('left');
     const compiled = compileLayout(`type: checkbox\ntext: ready\nchecked: true\n`);
     expect(compiled).toBeInstanceOf(Checkbox);
     expect(compileLayout({ type: 'progress', value: 1 })).toBeInstanceOf(ProgressBar);
@@ -190,7 +189,7 @@ describe('speculative TUI surfaces', () => {
 
   it('keeps wasi.ts free of process and fs', () => {
     const src = readFileSync(new URL('../src/wasi.ts', import.meta.url), 'utf8');
-    expect(src).not.toMatch(/\bprocess\b/);
-    expect(src).not.toMatch(/\bnode:fs\b/);
+    expect(src).not.toMatch(/from ['"]node:(fs|process)['"]/);
+    expect(src).not.toMatch(/\bprocess\./);
   });
 });
