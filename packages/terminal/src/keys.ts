@@ -38,6 +38,24 @@ export interface KeyEvent {
   readonly shift?: boolean;
   readonly alt?: boolean;
   readonly ctrl?: boolean;
+  readonly meta?: boolean;
+  /** Present when `parseKeys` is called with `{ normalize: true }`. */
+  readonly normalized?: NormalizedKey;
+}
+
+/** Modifier-stripped key shared by Kitty CSI-u and legacy ESC+letter. */
+export interface NormalizedKey {
+  name: string;
+  shift: boolean;
+  alt: boolean;
+  ctrl: boolean;
+  meta: boolean;
+  ch?: string;
+}
+
+export interface ParseKeysOptions {
+  /** Attach a `normalized` field on each event and treat ESC+letter as alt. */
+  normalize?: boolean;
 }
 
 /** Progressive-enhancement bits for the Kitty keyboard protocol. */
@@ -90,9 +108,79 @@ const PASTE_END = '\x1b[201~';
  * keyboard releases, bare escape, alt+char, control characters, and
  * printable text. APC (Kitty graphics replies) is skipped.
  */
-export function parseKeys(buffer: string): KeyEvent[] {
+/**
+ * Collapse a KeyEvent into a modifier-stripped shape. Kitty CSI-u events
+ * (name `alt+a`, flags set) and legacy `alt+a` names land on the same object.
+ */
+export function normalizeKey(event: KeyEvent): NormalizedKey {
+  let name = String(event.name);
+  let alt = event.alt === true;
+  let ctrl = event.ctrl === true;
+  let shift = event.shift === true;
+  let meta = event.meta === true;
+
+  if (name.startsWith('ctrl+alt+')) {
+    name = name.slice('ctrl+alt+'.length);
+    ctrl = true;
+    alt = true;
+  } else if (name.startsWith('ctrl+')) {
+    name = name.slice('ctrl+'.length);
+    ctrl = true;
+  } else if (name.startsWith('alt+')) {
+    name = name.slice('alt+'.length);
+    alt = true;
+  } else if (name.startsWith('meta+')) {
+    name = name.slice('meta+'.length);
+    meta = true;
+  }
+
+  if (name === 'shift-tab') {
+    name = 'tab';
+    shift = true;
+  }
+
+  return event.ch === undefined
+    ? { name, shift, alt, ctrl, meta }
+    : { name, shift, alt, ctrl, meta, ch: event.ch };
+}
+
+/**
+ * Merge a run of events so a bare `escape` followed by a printable letter
+ * becomes a single alt+letter NormalizedKey (legacy ESC+char).
+ */
+export function normalizeKeys(events: readonly KeyEvent[]): NormalizedKey[] {
+  const out: NormalizedKey[] = [];
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i] as KeyEvent;
+    const next = events[i + 1];
+    if (event.name === 'escape' && next && isLegacyAltChar(next)) {
+      out.push({
+        name: next.ch ?? String(next.name),
+        shift: next.shift === true,
+        alt: true,
+        ctrl: next.ctrl === true,
+        meta: next.meta === true,
+        ...(next.ch !== undefined ? { ch: next.ch } : {}),
+      });
+      i += 1;
+      continue;
+    }
+    out.push(normalizeKey(event));
+  }
+  return out;
+}
+
+function isLegacyAltChar(event: KeyEvent): boolean {
+  if (event.alt || event.ctrl || event.meta) return false;
+  if (event.name === 'paste' || event.name === 'escape') return false;
+  const ch = event.ch ?? (event.name.length === 1 ? event.name : undefined);
+  return ch !== undefined && ch >= ' ' && ch <= '~';
+}
+
+export function parseKeys(buffer: string, options?: ParseKeysOptions): KeyEvent[] {
   const events: KeyEvent[] = [];
   if (isMouseEvent(buffer)) return events;
+  const asAlt = options?.normalize === true;
   let i = 0;
 
   while (i < buffer.length) {
@@ -135,6 +223,16 @@ export function parseKeys(buffer: string): KeyEvent[] {
         i += 2;
         continue;
       }
+      // Legacy alt+letter (ESC + printable) when normalize is requested.
+      // Default path keeps ESC as its own event so existing consumers hold.
+      if (asAlt && rest.length > 0) {
+        const ch = rest[0] as string;
+        if (ch >= ' ' && ch !== '[' && ch !== 'O') {
+          events.push({ name: `alt+${ch}`, ch, alt: true, kind: 'press' });
+          i += 2;
+          continue;
+        }
+      }
       events.push({ name: 'escape', kind: 'press' });
       i += 1;
       continue;
@@ -175,6 +273,9 @@ export function parseKeys(buffer: string): KeyEvent[] {
     i += 1;
   }
 
+  if (options?.normalize) {
+    return events.map((event) => ({ ...event, normalized: normalizeKey(event) }));
+  }
   return events;
 }
 
@@ -182,6 +283,7 @@ function parseModField(field: string | undefined): {
   shift: boolean;
   alt: boolean;
   ctrl: boolean;
+  meta: boolean;
   kind: KeyKind;
 } {
   const [modRaw, typeRaw] = (field ?? '1').split(':');
@@ -192,36 +294,53 @@ function parseModField(field: string | undefined): {
     shift: (mod & 1) !== 0,
     alt: (mod & 2) !== 0,
     ctrl: (mod & 4) !== 0,
+    meta: (mod & 8) !== 0,
     kind,
   };
 }
 
+function withMeta(event: KeyEvent, meta: boolean): KeyEvent {
+  return meta ? { ...event, meta: true } : event;
+}
+
 function namedKey(
   base: KeyName,
-  mods: { shift: boolean; alt: boolean; ctrl: boolean; kind: KeyKind },
+  mods: { shift: boolean; alt: boolean; ctrl: boolean; meta: boolean; kind: KeyKind },
   ch?: string,
 ): KeyEvent {
   let name: KeyName = base;
   if (mods.ctrl && mods.alt) name = `ctrl+alt+${base}`;
   else if (mods.ctrl) name = `ctrl+${base}`;
   else if (mods.alt) name = `alt+${base}`;
-  return { name, ch, kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl };
+  else if (mods.meta) name = `meta+${base}`;
+  return {
+    name,
+    ch,
+    kind: mods.kind,
+    shift: mods.shift,
+    alt: mods.alt,
+    ctrl: mods.ctrl,
+    ...(mods.meta ? { meta: true } : {}),
+  };
 }
 
 /** CSI u / functional-key mapping for the Kitty keyboard protocol. */
 function fromKeyCode(code: number, mods: ReturnType<typeof parseModField>): KeyEvent | null {
   switch (code) {
     case 27:
-      return { name: 'escape', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl };
+      return withMeta({ name: 'escape', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl }, mods.meta);
     case 13:
-      return { name: 'enter', ch: '\r', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl };
+      return withMeta({ name: 'enter', ch: '\r', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl }, mods.meta);
     case 9:
-      return mods.shift
-        ? { name: 'shift-tab', kind: mods.kind, shift: true, alt: mods.alt, ctrl: mods.ctrl }
-        : { name: 'tab', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl };
+      return withMeta(
+        mods.shift
+          ? { name: 'shift-tab', kind: mods.kind, shift: true, alt: mods.alt, ctrl: mods.ctrl }
+          : { name: 'tab', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl },
+        mods.meta,
+      );
     case 127:
     case 8:
-      return { name: 'backspace', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl };
+      return withMeta({ name: 'backspace', kind: mods.kind, shift: mods.shift, alt: mods.alt, ctrl: mods.ctrl }, mods.meta);
     case 32:
       return namedKey('space', mods, ' ');
     default:
@@ -248,13 +367,17 @@ function escapeSequence(code: string, letter: string): KeyEvent | null {
     return fromKeyCode(keyCode, mods);
   }
 
-  const nav = (name: KeyName): KeyEvent => ({
-    name,
-    kind: mods.kind,
-    shift: mods.shift,
-    alt: mods.alt,
-    ctrl: mods.ctrl,
-  });
+  const nav = (name: KeyName): KeyEvent =>
+    withMeta(
+      {
+        name,
+        kind: mods.kind,
+        shift: mods.shift,
+        alt: mods.alt,
+        ctrl: mods.ctrl,
+      },
+      mods.meta,
+    );
 
   switch (letter) {
     case 'A':
@@ -270,7 +393,7 @@ function escapeSequence(code: string, letter: string): KeyEvent | null {
     case 'F':
       return nav('end');
     case 'Z':
-      return { name: 'shift-tab', kind: mods.kind, shift: true, alt: mods.alt, ctrl: mods.ctrl };
+      return withMeta({ name: 'shift-tab', kind: mods.kind, shift: true, alt: mods.alt, ctrl: mods.ctrl }, mods.meta);
     case '~': {
       const param = first.split(':')[0] ?? '';
       switch (param) {
@@ -303,6 +426,11 @@ function escapeSequence(code: string, letter: string): KeyEvent | null {
  */
 export class KeyParser {
   private pending = '';
+  private readonly options: ParseKeysOptions;
+
+  constructor(options: ParseKeysOptions = {}) {
+    this.options = options;
+  }
 
   feed(chunk: string): KeyEvent[] {
     this.pending += chunk;
@@ -313,7 +441,7 @@ export class KeyParser {
 
     if (isMouseEvent(ready)) return [];
 
-    return parseKeys(ready);
+    return parseKeys(ready, this.options);
   }
 
   /** Index up to which the buffer can be split without cutting a sequence. */
