@@ -13,13 +13,14 @@ export interface MixChannelsOptions {
 export function mixChannels(buffers: Float32Array[], options: MixChannelsOptions = {}): Float32Array {
   const length = buffers.reduce((max, buf) => Math.max(max, buf.length), 0);
   const out = new Float32Array(length);
-  const duck = options.duck ?? [];
+  const amounts = options.duck ?? [];
 
   for (let b = 0; b < buffers.length; b++) {
     const buf = buffers[b];
     if (buf === undefined) continue;
-    const amount = duck[b];
-    const source = amount !== undefined && amount !== 0 ? duck(buf, othersPeak(buffers, b, length), amount) : buf;
+    const amount = amounts[b];
+    const source =
+      amount !== undefined && amount !== 0 ? duck(buf, othersPeak(buffers, b, length), amount) : buf;
     for (let i = 0; i < source.length; i++) {
       out[i] = (out[i] ?? 0) + (source[i] ?? 0);
     }
