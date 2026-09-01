@@ -161,6 +161,35 @@ export class ConsoleKernel {
   }
 
   /**
+   * Tab-completion candidates for a partial argv.
+   *
+   * - `[]` → all command names.
+   * - `['g']` → commands starting with "g".
+   * - `['greet']` → `[]` (command is fully typed).
+   * - `['greet', '']` → nothing (positional args have no completion data).
+   * - `['greet', '--']` → `['--verbose']` etc. (option flags).
+   */
+  complete(argv: string[]): string[] {
+    if (argv.length === 0) {
+      return this.list().map((e) => e.name);
+    }
+    if (argv.length === 1) {
+      const partial = argv[0]!;
+      if (partial === '') return this.list().map((e) => e.name);
+      return this.list().map((e) => e.name).filter((n) => n.startsWith(partial));
+    }
+    // Partial is the first token being typed (last token without args).
+    const partial = argv[argv.length - 1] ?? '';
+    const cmd = this.get(argv[0]!);
+    if (!cmd) return [];
+    if (partial === '' || partial.startsWith('-')) {
+      // Option flag completion.
+      return cmd.signature.options.map((o) => `--${o.name}`);
+    }
+    return [];
+  }
+
+  /**
    * Names of every registered group, sorted. Groups come from `group:name`
    * command signatures — registering `db:migrate` creates the `db` group.
    */

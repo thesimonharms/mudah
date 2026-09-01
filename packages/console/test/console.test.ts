@@ -258,7 +258,7 @@ describe('help rendering', () => {
 
 describe('command aliases & deprecation', () => {
   class ShortCommand extends Command {
-    signature = 'short {name?}';
+    signature = 'short {name?} [--verbose]';
     description = 'Short form';
     aliases = ['s', 'quick'];
     async handle() {
@@ -321,6 +321,26 @@ describe('command aliases & deprecation', () => {
   it('still rejects unknown commands', async () => {
     const { kernel } = setupAliases();
     await expect(kernel.dispatch(['nope'])).rejects.toThrow(UsageError);
+  });
+
+  it('completes all commands when argv is empty', () => {
+    const { kernel } = setupAliases();
+    const candidates = kernel.complete([]);
+    expect(candidates).toContain('short');
+    expect(candidates).toContain('legacy');
+  });
+
+  it('filters commands by partial prefix', () => {
+    const { kernel } = setupAliases();
+    expect(kernel.complete(['s'])).toContain('short');
+    expect(kernel.complete(['l'])).toContain('legacy');
+    expect(kernel.complete(['z'])).toEqual([]);
+  });
+
+  it('completes option flags after a known command', () => {
+    const { kernel } = setupAliases();
+    const flags = kernel.complete(['short', '--']);
+    expect(flags).toContain('--verbose');
   });
 });
 

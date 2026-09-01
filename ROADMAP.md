@@ -106,7 +106,7 @@ Built this session (newly committed), modularly per package:
 - Provider lifecycle hooks: `onShutdown()`, `onConfigChanged()` ✅
 
 ### `@mudah-cli/console`
-- Tab completion for commands, args, and options
+- Tab completion for commands, args, and options ✅
 - Persistent command history (readline-style) per app ✅
 - Typed argument coercion (`int`, `float`, `path`, `glob`, `enum`) ✅
 - Man-page-style grouped help rendering
