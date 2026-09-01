@@ -75,8 +75,9 @@ tui.snapshot(); // ASCII
 tui.tree();     // JSON { role, name, value, focused, bounds, children }
 ```
 
-`SessionRecorder` `{ record(action), dump(), replay(tui) }` — no PTY.
-`fromLayout({ type: 'column'|'row'|'label'|'list', children?, text?, items? })`.
+`SessionRecorder` `{ record(action), dump(), tape(), replay(tui) }` — no PTY. Timed replay: `replayTapeAsync`.
+`fromLayout` / `parseLayout` / `compileLayout` (`column|row|split|label|list|panel|checkbox|progress`).
+`VideoPlayer` (half-block / Kitty, pause/seek). `LayoutDebugger` overlay. `renderWidgetToText` (no process I/O).
 
 No PTY. No Ink. No Blessed. No raw `\x1b[` in app code.
 

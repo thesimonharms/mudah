@@ -36,8 +36,9 @@ function nodeOf(component: Component, bounds: ChildBounds | undefined, focused: 
   return node;
 }
 
-/** JSON tree of a layout. This is the DOM for agents. */
-export function dumpTree(root: Layout): TreeNode {
+/** JSON tree of a layout (or a single widget). This is the DOM for agents. */
+export function dumpTree(root: Component): TreeNode {
   root.render();
-  return nodeOf(root, undefined, root.focused);
+  const focused = root instanceof Layout ? root.focused : undefined;
+  return nodeOf(root, undefined, focused);
 }

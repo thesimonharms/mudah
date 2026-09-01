@@ -1,10 +1,9 @@
-import { createInterface } from 'node:readline';
 import { Command } from '@mudah-cli/console';
-import { handleLspMessage, type LspMessage } from '../lsp.js';
+import { decodeLspFrames, encodeLspFrame, handleLspMessage, type LspMessage } from '../lsp.js';
 
 /**
- * Built-in `lsp` command: a stdio JSON-RPC subset for Mudah apps.
- * Default (and `--probe`) prints ready and exits. `--stdio` speaks LSP.
+ * Built-in `lsp` command: stdio JSON-RPC (Content-Length framed, with a
+ * newline-delimited fallback for probes).
  */
 export default class LspCommand extends Command {
   signature = 'lsp [--stdio] [--probe]';
@@ -21,29 +20,28 @@ export default class LspCommand extends Command {
 
   private serveStdio(): Promise<number> {
     return new Promise((resolve) => {
-      const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
-      rl.on('line', (line) => {
-        const trimmed = line.trim();
-        if (trimmed === '') return;
-        let msg: LspMessage;
-        try {
-          msg = JSON.parse(trimmed) as LspMessage;
-        } catch {
-          return;
-        }
-        if (msg.method === 'exit') {
-          rl.close();
-          resolve(0);
-          return;
-        }
-        const reply = handleLspMessage(msg);
-        if (reply !== undefined) process.stdout.write(`${JSON.stringify(reply)}\n`);
-        if (msg.method === 'shutdown') {
-          rl.close();
-          resolve(0);
+      let buffer = '';
+      const write = (msg: LspMessage): void => {
+        process.stdout.write(encodeLspFrame(msg));
+      };
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', (chunk: string) => {
+        buffer += chunk;
+        const decoded = decodeLspFrames(buffer);
+        buffer = decoded.rest;
+        for (const msg of decoded.messages) {
+          if (msg.method === 'exit') {
+            resolve(0);
+            return;
+          }
+          const reply = handleLspMessage(msg);
+          if (reply !== undefined) write(reply);
+          if (msg.method === 'shutdown') {
+            resolve(0);
+          }
         }
       });
-      rl.on('close', () => resolve(0));
+      process.stdin.on('end', () => resolve(0));
     });
   }
 }

@@ -305,7 +305,7 @@ describe('Application remaining APIs', () => {
     expect(AsyncFlag.booted).toBe(true);
   });
 
-  it('redirects streams and reports provider health', async () => {
+  it('reports provider health', async () => {
     class Healthy extends ServiceProvider {
       health() {
         return { status: 'ok' as const, detail: 'ready' };
@@ -321,5 +321,33 @@ describe('Application remaining APIs', () => {
     expect(report[0]?.provider).toBe('Healthy');
     expect(report[0]?.status).toBe('ok');
     expect(report[0]?.detail).toBe('ready');
+  });
+
+  it('reloadPlugins boots providers that arrive after boot and emits plugins.reloaded', async () => {
+    const order: string[] = [];
+    class LateProvider extends ServiceProvider {
+      register(): void {
+        order.push('late-register');
+      }
+      boot(): void {
+        order.push('late-boot');
+      }
+    }
+    const app = freshApp();
+    await app.boot();
+    let emitted = 0;
+    app.events().on('plugins.reloaded', () => {
+      emitted += 1;
+    });
+    await app.reloadPlugins({
+      include: ['late-plugin'],
+      resolve: async () => 'file:///late/index.js',
+      importModule: async (url) => {
+        expect(url).toContain('mudahReload=');
+        return { providers: [LateProvider] };
+      },
+    });
+    expect(order).toEqual(['late-register', 'late-boot']);
+    expect(emitted).toBe(1);
   });
 });

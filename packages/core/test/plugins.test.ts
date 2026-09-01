@@ -281,3 +281,18 @@ describe('gatePlugin', () => {
     expect(gatePlugin(plugin, { coreVersion: '0.8.1' }).ok).toBe(true);
   });
 });
+
+describe('loadPlugin cache bust', () => {
+  it('appends mudahReload to the import URL', async () => {
+    const imported: string[] = [];
+    await loadPlugin('demo-plugin', '/app', {
+      bustCache: 'tick',
+      resolve: async () => 'file:///app/node_modules/demo-plugin/index.js',
+      importModule: async (url) => {
+        imported.push(url);
+        return { providers: [] };
+      },
+    });
+    expect(imported[0]).toContain('mudahReload=tick');
+  });
+});

@@ -10,7 +10,7 @@ export default class PluginsUpdateCommand extends Command {
   description = 'Re-scan installed plugins';
 
   async handle() {
-    const plugins = await this.app.discoverPlugins();
+    const plugins = await this.app.reloadPlugins();
     this.output.success(t('plugins.upToDate'));
     this.output.keyValue('plugins', String(plugins.length));
     for (const warning of this.app.pluginWarnings()) {

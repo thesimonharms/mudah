@@ -16,6 +16,7 @@ const EN: MessageDict = {
   'plugins.none': 'No plugins discovered',
   'plugins.upToDate': 'Plugins are up to date',
   'plugins.listed': '{count} plugin(s)',
+  'plugins.reloaded': 'Plugins reloaded',
   'prompt.continue': 'Continue?',
   'cache.empty': 'Cache is empty',
   'migrate.empty': 'No migrations to apply',
