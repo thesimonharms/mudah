@@ -10,10 +10,21 @@ import { validateSchema, type Schema, type SchemaResult } from './schema.js';
  */
 export class ConfigRepository {
   private root: Record<string, unknown> = {};
+  private onChange?: (key: string) => void;
+
+  /** Register a callback to be notified when any config value is mutated. */
+  onChangeNotification(cb: (key: string) => void): void {
+    this.onChange = cb;
+  }
+
+  private notify(key: string): void {
+    this.onChange?.(key);
+  }
 
   /** Set a value at a dotted key, creating intermediate objects as needed. */
   set(key: string, value: unknown): this {
     assignPath(this.root, key, value);
+    this.notify(key);
     return this;
   }
 
@@ -29,7 +40,9 @@ export class ConfigRepository {
 
   /** Remove a dotted key. Returns whether anything was removed. */
   delete(key: string): boolean {
-    return removePath(this.root, key);
+    const removed = removePath(this.root, key);
+    if (removed) this.notify(key);
+    return removed;
   }
 
   /** The entire configuration tree (live reference, use with care). */

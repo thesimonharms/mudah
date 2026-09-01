@@ -157,6 +157,9 @@ export class Application extends Container {
 
     this.booted = true;
     await this.events().emit('app.booted', { app: this });
+    this.config().onChangeNotification((key) => {
+      void this.events().emit('config.changed', { key });
+    });
 
     if (!profile) return undefined;
 

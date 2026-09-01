@@ -3,9 +3,11 @@ import type { Application } from './application.js';
 /** Typed application lifecycle events. */
 export interface AppEvents {
   'app.booted': { app: Application };
+  'app.shutdown': { app: Application };
   'command.before': { command: string; argv: string[] };
   'command.after': { command: string; exitCode: number; durationMs: number };
   'command.error': { command: string; error: unknown };
+  'config.changed': { key: string };
 }
 
 export type EventHandler<E> = (payload: E) => void | Promise<void>;

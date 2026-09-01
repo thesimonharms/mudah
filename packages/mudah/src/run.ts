@@ -330,7 +330,6 @@ export async function run(options: RunOptions = {}): Promise<number> {
 
   try {
     const code = await kernel.dispatch(resolveGroup(kernel, dispatchArgv));
-    cleanupMonitors();
     if (jsonMode) {
       stdout.write(
         output.jsonEnvelope({
@@ -353,7 +352,6 @@ export async function run(options: RunOptions = {}): Promise<number> {
     }
     return code;
   } catch (rawError) {
-    cleanupMonitors();
     let parsed: { message: string; hint?: string; usage?: string };
     if (rawError instanceof UsageError) {
       parsed = { message: rawError.message, hint: rawError.hint, usage: rawError.usage };
@@ -376,6 +374,9 @@ export async function run(options: RunOptions = {}): Promise<number> {
       );
     }
     return code;
+  } finally {
+    cleanupMonitors();
+    await app.events().emit('app.shutdown', { app });
   }
 }
 
