@@ -45,11 +45,15 @@ export {
   DashboardScreen,
   FormScreen,
   TableScreen,
+  TreeScreen,
+  SplitScreen,
   type WizardOptions,
   type WizardStep,
   type DashboardOptions,
   type FormOptions,
   type TableOptions,
+  type TreeOptions,
+  type MasterDetailOptions,
 } from './screens.js';
 export { Stack } from './stack.js';
 export { Overlay, type PaletteItem } from './overlay.js';

@@ -19,6 +19,7 @@ import {
   Stack,
   TextInput,
   Tree,
+  type TreeNodeData,
 } from '@mudah-cli/tui';
 import { TestTui } from '@mudah-cli/testing';
 
@@ -392,5 +393,41 @@ describe('Breadcrumb', () => {
 
   it('is focusable', () => {
     expect(new Breadcrumb([]).focusable).toBe(true);
+  });
+});
+
+describe('Screen.tree', () => {
+  it('renders nodes and selects a path on enter', () => {
+    const nodes: TreeNodeData[] = [
+      { label: 'src', children: [{ label: 'index.ts' }, { label: 'util.ts' }] },
+      { label: 'test' },
+    ];
+    const screen = Screen.tree({ title: 'Files', nodes });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 12 });
+    expect(tui.snapshot()).toContain('Files');
+    expect(tui.snapshot()).toContain('src');
+    // Space expands src, down moves to index.ts, enter selects.
+    tui.send('space');
+    tui.send('down');
+    tui.send('enter');
+    expect(screen.result()).toBe('src/index.ts');
+  });
+});
+
+describe('Screen.split', () => {
+  it('shows a list on the left and detail on the right, updates on move', () => {
+    const screen = Screen.split({
+      title: 'Hosts',
+      items: ['db', 'web', 'cache'],
+      detail: (selected) => [`Status of ${selected}: up`],
+    });
+    const tui = TestTui.mount(screen.root, { cols: 80, rows: 12 });
+    expect(tui.snapshot()).toContain('Status of db: up');
+    // Move down and check detail updates.
+    tui.send('down');
+    expect(screen.detailPanel.render().join('\n')).toContain('Status of web: up');
+    // Enter selects the current item.
+    screen.list.confirm();
+    expect(screen.result()).toBe('web');
   });
 });

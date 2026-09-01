@@ -107,39 +107,40 @@ Built this session (newly committed), modularly per package:
 ### `@mudah-cli/console`
 - Tab completion for commands, args, and options
 - Persistent command history (readline-style) per app
-- Typed argument coercion (`int`, `float`, `path`, `glob`, `enum`)
+- Typed argument coercion (`int`, `float`, `path`, `glob`, `enum`) ✅
 - Man-page-style grouped help rendering
-- Fuzzy command lookup on typo (did-you-mean via `FuzzyList`)
-- Subcommand aliases (e.g. `db:ls` ↔ `db:list`)
+- Fuzzy command lookup on typo (did-you-mean via `FuzzyList`) ✅
+- Subcommand aliases (e.g. `db:ls` ↔ `db:list`) ✅
 
 ### `@mudah-cli/tui` — widgets
-- `Breadcrumb` (trailing-ellipsis, clickable crumbs)
-- `Calendar` / `DatePicker` (arrow + typing)
+- `Breadcrumb` (trailing-ellipsis, clickable crumbs) ✅
+- `Calendar` / `DatePicker` (arrow + typing) ✅
 - `FileBrowser` (tree file picker, with `FuzzyList` filter)
 - `MenuBar` (pull-down menus, alt-underline access keys)
 - `Toolbar` (iconic command strip)
-- `Tooltip` / `Popover` (anchored to a widget)
-- `TextArea` (multiline `TextInput`, with scrollbars)
-- `Checkbox` / `RadioButton` group
+- `Tooltip` / `Popover` (anchored to a widget) ✅
+- `TextArea` (multiline `TextInput`, with scrollbars) ✅
+- `Checkbox` / `RadioButton` group ✅
 - `VirtualList` (windowing for large datasets)
 - `ResizableSplit` (live drag, like tmux resize-pane)
-- `Spinner` widget (animation-driven)
+- `Spinner` widget (animation-driven) ✅
 - `Pager` (less-like: search, jump, scrollback)
 - `MetricGauge` (mini dial / progress ring)
 - `TreeView` (expand/collapse + keyboard nav)
-- `Chart` widget wrapping the ui bar/line chart primitives
+- `Chart` widget wrapping the ui bar/line chart primitives ✅
+- `ProgressBar` (determinate display bar) ✅
 
 ### `@mudah-cli/tui` — `Screen.*` flows
-- `Screen.form` (wizard built from a `Form.fromSchema`)
-- `Screen.tree` (navigable tree + result)
-- `Screen.table` (CRUD over rows)
+- `Screen.form` (wizard built from a `Form.fromSchema`) ✅
+- `Screen.tree` (navigable tree + result) ✅
+- `Screen.table` (CRUD over rows) ✅
 - `Screen.pivot` (pivot-table over rows)
-- `Screen.split` (side-by-side master/detail)
+- `Screen.split` (side-by-side master/detail) ✅
 - `Screen.notifications` (toast log center)
 - `Screen.menu` (command palette over a menu)
 
 ### `@mudah-cli/testing`
-- Style/ANSI assertions in snapshots (`expect(snap).toHaveColor('green')`)
+- Style/ANSI assertions in snapshots (`expect(snap).toHaveColor('green')`) ✅
 - Text-tree visual diff (char-level diff of `snapshot()`)
 - `tui.snapshot()` baseline file format + `--update` flag
 - Time-travel: `tui.undo()` / `tui.redo()` for stepping

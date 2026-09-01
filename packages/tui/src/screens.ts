@@ -6,6 +6,7 @@ import type { Program } from './program.js';
 import { HelpFooter } from './chrome.js';
 import { keys } from './keymap.js';
 import { Label, List, Panel, Table, Viewport, type TableColumnDef } from './widgets.js';
+import { Tree, type TreeNodeData } from './extras.js';
 import { Form } from './form.js';
 
 export interface PickerOptions {
@@ -267,10 +268,77 @@ export class TableScreen extends ScreenHandle<string[] | number> {
   }
 }
 
+export interface TreeOptions {
+  title?: string;
+  nodes: TreeNodeData[];
+}
+
+/** A navigable tree screen. Returns the selected path string on enter. */
+export class TreeScreen extends ScreenHandle<string> {
+  readonly root: Column;
+  readonly tree: Tree;
+
+  constructor(options: TreeOptions) {
+    super();
+    this.tree = new Tree(options.nodes, (path) => {
+      this.value = path;
+      this.done?.();
+    });
+    this.root = new Column().add(
+      new Label(options.title ?? 'Tree'),
+      this.tree,
+      new HelpFooter({ ...keys.table, escape: 'quit' }),
+    );
+  }
+}
+
+export interface MasterDetailOptions {
+  title?: string;
+  items: string[];
+  /** Render the detail view for the selected item. */
+  detail: (selected: string) => string[];
+  ratio?: number;
+}
+
+/** A side-by-side master/detail screen. The left panel lists items; the right
+ *  renders detail for the selected item. Returns the selected item on enter. */
+export class SplitScreen extends ScreenHandle<string> {
+  readonly root: Column;
+  readonly detailPanel: Panel;
+  readonly list: List;
+  private readonly items: string[];
+
+  constructor(options: MasterDetailOptions) {
+    super();
+    this.items = options.items;
+    this.detailPanel = new Panel(options.title ?? 'Detail', options.detail(options.items[0] ?? ''));
+    this.list = new List(options.items, (index) => {
+      this.value = this.items[index];
+      this.done?.();
+    });
+    // Update detail panel when the cursor moves.
+    const origMove = this.list.move.bind(this.list);
+    this.list.move = (delta: number): void => {
+      origMove(delta);
+      this.detailPanel.setBody(options.detail(this.list.selected ?? ''));
+    };
+    this.root = new Column().add(
+      new Label(options.title ?? 'Split'),
+      new Split({ axis: 'horizontal', ratio: options.ratio ?? 0.4 }).add(
+        this.list,
+        this.detailPanel,
+      ),
+      new HelpFooter({ ...keys.table, ...keys.split, escape: 'quit' }),
+    );
+  }
+}
+
 export const Screen = {
   picker: (options: PickerOptions): PickerScreen => new PickerScreen(options),
   wizard: (options: WizardOptions): WizardScreen => new WizardScreen(options),
   form: (options: FormOptions): FormScreen => new FormScreen(options),
   table: (options: TableOptions): TableScreen => new TableScreen(options),
+  tree: (options: TreeOptions): TreeScreen => new TreeScreen(options),
+  split: (options: MasterDetailOptions): SplitScreen => new SplitScreen(options),
   dashboard: (options: DashboardOptions): DashboardScreen => new DashboardScreen(options),
 };
