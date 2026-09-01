@@ -1,0 +1,15 @@
+{
+  "name": "mudah-command",
+  "displayName": "Mudah command files",
+  "description": "TextMate grammar for *.command.ts (signature, description, handle).",
+  "contributes": {
+    "grammars": [
+      {
+        "language": "typescript",
+        "scopeName": "source.ts.mudah.command",
+        "path": "./mudah.tmLanguage.json",
+        "injectTo": ["source.ts"]
+      }
+    ]
+  }
+}

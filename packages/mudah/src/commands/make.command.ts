@@ -41,7 +41,48 @@ export default defineConfig({
 });
 `;
 
-const TUI_HINT = 'Use: make {command|provider|config|tui} {name}';
+const TUI_HINT = 'Use: make {command|provider|config|tui|plugin} {name}';
+
+const PLUGIN_PACKAGE = (name: string): string =>
+  JSON.stringify(
+    {
+      name,
+      version: '0.1.0',
+      private: true,
+      description: `${name} — a Mudah plugin`,
+      type: 'module',
+      license: 'MIT',
+      keywords: ['mudah-plugin', 'cli'],
+      exports: { '.': './src/index.ts' },
+      dependencies: { '@mudah-cli/mudah': '^0.8.0' },
+    },
+    null,
+    2,
+  ) + '\n';
+
+const PLUGIN_INDEX = (name: string, className: string): string => `import { Command, ServiceProvider } from '@mudah-cli/mudah';
+
+/** Binds services this plugin contributes. */
+export class ${className}Provider extends ServiceProvider {
+  register(): void {}
+
+  boot(): void {}
+}
+
+export class ${className}HelloCommand extends Command {
+  signature = '${name}:hello';
+  description = 'Hello from the ${name} plugin';
+  groupDescription = '${className} plugin';
+
+  async handle(): Promise<number> {
+    this.output.success('Hello from ${name}');
+    return 0;
+  }
+}
+
+export const providers = [${className}Provider];
+export const commands = [${className}HelloCommand];
+`;
 
 const TUI_PICKER = (command: string, className: string): string => `import { Command } from '@mudah-cli/mudah';
 import { Program, Screen } from '@mudah-cli/mudah/tui';
@@ -125,13 +166,13 @@ export default class ${className} extends Command {
  */
 export default class MakeCommand extends Command {
   signature = 'make {type} {name}';
-  description = 'Scaffold a command, provider, config file, or TUI screen';
+  description = 'Scaffold a command, provider, config file, TUI screen, or plugin';
 
   async handle() {
     const type = this.arg('type')!;
     const name = this.arg('name')!;
 
-    if (!['command', 'provider', 'config', 'tui'].includes(type)) {
+    if (!['command', 'provider', 'config', 'tui', 'plugin'].includes(type)) {
       throw this.usageError(`Unknown make type "${type}".`, TUI_HINT);
     }
     if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(name)) {
@@ -140,6 +181,11 @@ export default class MakeCommand extends Command {
 
     const k = kebab(name);
     const className = pascal(name);
+
+    if (type === 'plugin') {
+      await this.writePlugin(k, className);
+      return;
+    }
 
     let filePath: string;
     let content: string;
@@ -174,5 +220,25 @@ export default class MakeCommand extends Command {
     }
 
     this.output.success(`Created ${relative(this.app.basePath, filePath)}`);
+  }
+
+  private async writePlugin(k: string, className: string): Promise<void> {
+    const dir = join(this.app.basePath, `${k}-plugin`);
+    if (isAbsolute(dir) === false || !dir.startsWith(this.app.basePath)) {
+      throw this.usageError('Refusing to write outside the app directory.');
+    }
+    const pkgPath = join(dir, 'package.json');
+    const srcPath = join(dir, 'src', 'index.ts');
+    try {
+      await mkdir(join(dir, 'src'), { recursive: true });
+      await writeFile(pkgPath, PLUGIN_PACKAGE(k), { flag: 'wx' });
+      await writeFile(srcPath, PLUGIN_INDEX(k, className), { flag: 'wx' });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw this.usageError(`${relative(this.app.basePath, dir)} already exists.`);
+      }
+      throw error;
+    }
+    this.output.success(`Created ${relative(this.app.basePath, srcPath)}`);
   }
 }

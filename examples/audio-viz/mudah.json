@@ -1,0 +1,9 @@
+{
+  "name": "audio-viz",
+  "version": "0.1.0",
+  "bin": "audio-viz",
+  "description": "Audio visualizer TUI",
+  "ui": {
+    "theme": "auto"
+  }
+}
