@@ -24,6 +24,7 @@ import {
   MetricGauge,
   NotificationsScreen,
   MenuScreen,
+  PivotScreen,
   type NotificationEntry,
 } from '@mudah-cli/tui';
 import { TestTui } from '@mudah-cli/testing';
@@ -507,5 +508,33 @@ describe('Screen.menu', () => {
     tui.send('b');
     tui.send('enter');
     expect(screen.result()).toBe('build');
+  });
+});
+
+describe('Screen.pivot', () => {
+  it('groups rows by a column and shows counts', () => {
+    const screen = Screen.pivot({
+      title: 'Env count',
+      columns: [{ header: 'env' }, { header: 'host' }],
+      rows: [
+        ['prod', 'web'],
+        ['prod', 'db'],
+        ['staging', 'web'],
+      ],
+    });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    const snap = tui.snapshot();
+    expect(snap).toContain('Env count');
+    expect(snap).toContain('prod');
+    expect(snap).toContain('2');
+    expect(snap).toContain('staging');
+    expect(snap).toContain('1');
+    // Enter returns the grouped rows.
+    screen.table.confirm();
+    const result = screen.result();
+    expect(result).toEqual(expect.arrayContaining([
+      expect.arrayContaining(['prod', '2']),
+      expect.arrayContaining(['staging', '1']),
+    ]));
   });
 });

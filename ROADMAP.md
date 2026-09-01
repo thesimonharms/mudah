@@ -134,7 +134,7 @@ Built this session (newly committed), modularly per package:
 - `Screen.form` (wizard built from a `Form.fromSchema`) ✅
 - `Screen.tree` (navigable tree + result) ✅
 - `Screen.table` (CRUD over rows) ✅
-- `Screen.pivot` (pivot-table over rows)
+- `Screen.pivot` (pivot-table over rows) ✅
 - `Screen.split` (side-by-side master/detail) ✅
 - `Screen.notifications` (toast log center) ✅
 - `Screen.menu` (command palette over a menu) ✅

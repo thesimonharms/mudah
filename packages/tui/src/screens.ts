@@ -334,6 +334,56 @@ export class SplitScreen extends ScreenHandle<string> {
   }
 }
 
+export interface PivotOptions {
+  title?: string;
+  columns: TableColumnDef[];
+  rows: string[][];
+  /** Column index to group by. Defaults to 0. */
+  groupBy?: number;
+}
+
+/** A pivot-table screen. Groups rows by a column and shows per-group counts.
+ *  Arrow keys cycle through groupBy columns; enter returns the grouped view. */
+export class PivotScreen extends ScreenHandle<string[][]> {
+  readonly root: Column;
+  readonly table: Table;
+  private readonly columns: TableColumnDef[];
+  private readonly rows: string[][];
+  private groupIndex: number;
+
+  constructor(options: PivotOptions) {
+    super();
+    this.columns = options.columns;
+    this.rows = options.rows;
+    this.groupIndex = options.groupBy ?? 0;
+    this.table = new Table(this.buildColumns(), this.buildRows(), (index) => {
+      this.value = this.buildRows();
+      this.done?.();
+    });
+    this.root = new Column().add(
+      new Label(options.title ?? 'Pivot'),
+      this.table,
+      new HelpFooter({ ...keys.table, escape: 'quit' }),
+    );
+  }
+
+  private buildColumns(): TableColumnDef[] {
+    const groupLabel = this.columns[this.groupIndex]?.header ?? `col${this.groupIndex}`;
+    return [{ header: groupLabel }, { header: 'count' }];
+  }
+
+  private buildRows(): string[][] {
+    const counts = new Map<string, number>();
+    for (const row of this.rows) {
+      const key = row[this.groupIndex] ?? '';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => [key, String(count)]);
+  }
+}
+
 export interface NotificationEntry {
   type: 'success' | 'error' | 'info' | 'warn';
   label: string;
@@ -397,6 +447,7 @@ export const Screen = {
   table: (options: TableOptions): TableScreen => new TableScreen(options),
   tree: (options: TreeOptions): TreeScreen => new TreeScreen(options),
   split: (options: MasterDetailOptions): SplitScreen => new SplitScreen(options),
+  pivot: (options: PivotOptions): PivotScreen => new PivotScreen(options),
   notifications: (options: NotificationsOptions): NotificationsScreen => new NotificationsScreen(options),
   menu: (options: MenuOptions): MenuScreen => new MenuScreen(options),
   dashboard: (options: DashboardOptions): DashboardScreen => new DashboardScreen(options),
