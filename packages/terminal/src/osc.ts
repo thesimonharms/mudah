@@ -36,6 +36,24 @@ export const osc = {
     stream.write(oscSequence(777, `notify;${title};${message}`));
   },
 
+  /**
+   * OSC 9;1 progress. `percent` is clamped to 0–100.
+   * Terminals that understand the 9.1 variant treat this as a determinate
+   * progress indicator; others ignore it.
+   */
+  progress(stream: OscWriter, percent: number): void {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    stream.write(oscSequence(9, `1;${clamped}`));
+  },
+
+  /**
+   * OSC 9;2 bell variant. A notification-channel bell, distinct from
+   * the ASCII BEL used by `osc.notify`.
+   */
+  bell(stream: OscWriter): void {
+    stream.write(oscSequence(9, '2'));
+  },
+
   /** OSC 8 hyperlink: `text` renders as a clickable link to `uri`. */
   hyperlink(stream: OscWriter, uri: string, text: string): void {
     stream.write(hyperlinkWrap(uri, text));
@@ -72,6 +90,9 @@ export function guardedOsc(stream: OscWriter, caps: { osc9: boolean; osc133: boo
     notify: (title: string, message: string) => {
       if (caps.osc9) osc.notify(stream, title, message);
     },
+    /** No dedicated 9.1/9.2 capability — always emit. */
+    progress: (percent: number) => osc.progress(stream, percent),
+    bell: () => osc.bell(stream),
     hyperlink: (uri: string, text: string) => osc.hyperlink(stream, uri, text),
     workingDir: (cwd: string) => {
       if (caps.osc7) osc.workingDir(stream, cwd);
