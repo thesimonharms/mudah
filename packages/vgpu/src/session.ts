@@ -128,9 +128,22 @@ export class ShaderSession {
     return this;
   }
 
-  /** Merge and write a flat uniform record (audio-reactive helpers use this). */
+  /**
+   * Merge a uniform record for audio-reactive / slider helpers.
+   * Best-effort GPU write: missing WGSL bindings are kept on the session.
+   */
   setUniforms(values: Record<string, unknown>): this {
-    return this.set(values);
+    this.lastUniforms = { ...this.lastUniforms, ...flattenUniforms(values) };
+    try {
+      this.effect.set(values);
+    } catch {
+      try {
+        this.effect.set({ params: this.lastUniforms });
+      } catch {
+        // Shader has no matching bindings; values stay on `uniforms()`.
+      }
+    }
+    return this;
   }
 
   /** Last values passed to `set` / `setUniforms` / `useShader`. */
@@ -178,4 +191,14 @@ export class ShaderSession {
     this.presenter.clear();
     this.gpu.dispose();
   }
+}
+
+function flattenUniforms(values: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...values };
+  const params = values['params'];
+  if (params !== undefined && typeof params === 'object' && params !== null && !Array.isArray(params)) {
+    Object.assign(out, params);
+    delete out['params'];
+  }
+  return out;
 }
