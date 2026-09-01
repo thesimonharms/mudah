@@ -20,13 +20,37 @@ afterEach(async () => {
 });
 
 function fakeFetch(body: unknown | null, ok = true): typeof fetch {
-  return (async (input: RequestInfo | URL) => {
+  return (async (input: string | URL) => {
     if (body === null) throw new Error(`offline: ${String(input)}`);
     return {
       ok,
       json: async () => body,
     } as unknown as Response;
   }) as unknown as typeof fetch;
+}
+
+function countingFetch(onCall: (count: number) => Record<string, unknown>): {
+  fetch: typeof fetch;
+  calls: () => number;
+} {
+  let calls = 0;
+  const stub: typeof fetch = (async () => {
+    calls += 1;
+    return { ok: true, json: async () => onCall(calls) } as unknown as Response;
+  }) as unknown as typeof fetch;
+  return { fetch: stub, calls: () => calls };
+}
+
+function recordingFetch(body: Record<string, unknown>): {
+  fetch: typeof fetch;
+  urls: string[];
+} {
+  const urls: string[] = [];
+  const stub: typeof fetch = (async (input: string | URL) => {
+    urls.push(String(input));
+    return { ok: true, json: async () => body } as unknown as Response;
+  }) as unknown as typeof fetch;
+  return { fetch: stub, urls };
 }
 
 describe('resolveRemoteUrl', () => {
@@ -44,19 +68,14 @@ describe('resolveRemoteUrl', () => {
 
 describe('loadRemoteConfig', () => {
   it('fetches and caches on a miss', async () => {
-    let calls = 0;
-    const fetch = ((async () => {
-      calls += 1;
-      return { ok: true, json: async () => ({ name: 'remote' }) } as unknown as Response;
-    }) as unknown) as typeof fetch;
-
+    const stub = countingFetch(() => ({ name: 'remote' }));
     const first = await loadRemoteConfig('https://example.com/c.json', {
       cacheDir,
-      fetch,
+      fetch: stub.fetch,
       now: () => 1_000,
     });
     expect(first).toEqual({ name: 'remote' });
-    expect(calls).toBe(1);
+    expect(stub.calls()).toBe(1);
 
     const cached = JSON.parse(
       await readFile(join(cacheDir, REMOTE_CONFIG_CACHE_FILE), 'utf8'),
@@ -66,45 +85,35 @@ describe('loadRemoteConfig', () => {
   });
 
   it('reuses a fresh cache without fetching', async () => {
-    let calls = 0;
-    const fetch = ((async () => {
-      calls += 1;
-      return { ok: true, json: async () => ({ n: calls }) } as unknown as Response;
-    }) as unknown) as typeof fetch;
-
+    const stub = countingFetch((n) => ({ n }));
     await loadRemoteConfig('https://example.com/c.json', {
       cacheDir,
-      fetch,
+      fetch: stub.fetch,
       now: () => 10_000,
     });
     const hit = await loadRemoteConfig('https://example.com/c.json', {
       cacheDir,
-      fetch,
+      fetch: stub.fetch,
       now: () => 10_000 + 60_000,
     });
     expect(hit).toEqual({ n: 1 });
-    expect(calls).toBe(1);
+    expect(stub.calls()).toBe(1);
   });
 
   it('refetches when the cache is stale', async () => {
-    let calls = 0;
-    const fetch = ((async () => {
-      calls += 1;
-      return { ok: true, json: async () => ({ n: calls }) } as unknown as Response;
-    }) as unknown) as typeof fetch;
-
+    const stub = countingFetch((n) => ({ n }));
     await loadRemoteConfig('https://example.com/c.json', {
       cacheDir,
-      fetch,
+      fetch: stub.fetch,
       now: () => 10_000,
     });
     const stale = await loadRemoteConfig('https://example.com/c.json', {
       cacheDir,
-      fetch,
+      fetch: stub.fetch,
       now: () => 10_000 + REMOTE_CONFIG_TTL_MS + 1,
     });
     expect(stale).toEqual({ n: 2 });
-    expect(calls).toBe(2);
+    expect(stub.calls()).toBe(2);
   });
 
   it('returns cache when fetch fails after a previous hit', async () => {
@@ -130,29 +139,22 @@ describe('loadRemoteConfig', () => {
   });
 
   it('strips remote: before fetching', async () => {
-    const urls: string[] = [];
-    const fetch = ((async (input: RequestInfo | URL) => {
-      urls.push(String(input));
-      return { ok: true, json: async () => ({ ok: true }) } as unknown as Response;
-    }) as unknown) as typeof fetch;
-
-    await loadRemoteConfig('remote:https://example.com/c.json', { cacheDir, fetch });
-    expect(urls).toEqual(['https://example.com/c.json']);
+    const stub = recordingFetch({ ok: true });
+    await loadRemoteConfig('remote:https://example.com/c.json', {
+      cacheDir,
+      fetch: stub.fetch,
+    });
+    expect(stub.urls).toEqual(['https://example.com/c.json']);
   });
 
   it('accepts { remote: url } as the first argument', async () => {
-    const urls: string[] = [];
-    const fetch = ((async (input: RequestInfo | URL) => {
-      urls.push(String(input));
-      return { ok: true, json: async () => ({ from: 'opt' }) } as unknown as Response;
-    }) as unknown) as typeof fetch;
-
+    const stub = recordingFetch({ from: 'opt' });
     const result = await loadRemoteConfig({
       remote: 'https://example.com/from-opt.json',
       cacheDir,
-      fetch,
+      fetch: stub.fetch,
     });
     expect(result).toEqual({ from: 'opt' });
-    expect(urls).toEqual(['https://example.com/from-opt.json']);
+    expect(stub.urls).toEqual(['https://example.com/from-opt.json']);
   });
 });
