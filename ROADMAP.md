@@ -106,7 +106,7 @@ Built this session (newly committed), modularly per package:
 
 ### `@mudah-cli/console`
 - Tab completion for commands, args, and options
-- Persistent command history (readline-style) per app
+- Persistent command history (readline-style) per app ✅
 - Typed argument coercion (`int`, `float`, `path`, `glob`, `enum`) ✅
 - Man-page-style grouped help rendering
 - Fuzzy command lookup on typo (did-you-mean via `FuzzyList`) ✅

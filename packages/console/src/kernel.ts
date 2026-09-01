@@ -85,6 +85,17 @@ export class ConsoleKernel {
   /** Alias name -> canonical command name. Kept separate from `commands` so the
    * command list never shows alias duplicates. */
   private readonly aliases = new Map<string, string>();
+  private readonly _history: string[] = [];
+
+  /** Dispatched argv (most recent last). */
+  get history(): readonly string[] {
+    return this._history;
+  }
+
+  /** Clear the command history. */
+  clearHistory(): void {
+    this._history.length = 0;
+  }
 
   constructor(
     private readonly app: Application,
@@ -230,6 +241,7 @@ export class ConsoleKernel {
     const durationMs = Math.round(performance.now() - startedAt);
 
     await this.app.events().emit('command.after', { command: canonical, exitCode, durationMs });
+    this._history.push(argv.join(' '));
     return exitCode;
   }
 }

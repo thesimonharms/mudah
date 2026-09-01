@@ -323,3 +323,34 @@ describe('command aliases & deprecation', () => {
     await expect(kernel.dispatch(['nope'])).rejects.toThrow(UsageError);
   });
 });
+
+describe('command history', () => {
+  it('records dispatched argv', async () => {
+    const app = makeApp();
+    const holder = makeOutput();
+    const kernel = kernelFor(app, holder);
+    expect(kernel.history).toHaveLength(0);
+    await kernel.dispatch(['greet', 'world']);
+    expect(kernel.history).toEqual(['greet world']);
+    await kernel.dispatch(['greet', 'mars']);
+    expect(kernel.history).toEqual(['greet world', 'greet mars']);
+  });
+
+  it('clears history', async () => {
+    const app = makeApp();
+    const holder = makeOutput();
+    const kernel = kernelFor(app, holder);
+    await kernel.dispatch(['greet']);
+    expect(kernel.history).toHaveLength(1);
+    kernel.clearHistory();
+    expect(kernel.history).toHaveLength(0);
+  });
+
+  it('records history even on error exit codes', async () => {
+    const app = makeApp();
+    const holder = makeOutput();
+    const kernel = kernelFor(app, holder);
+    await kernel.dispatch(['code']);
+    expect(kernel.history).toContain('code');
+  });
+});
