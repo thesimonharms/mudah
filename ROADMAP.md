@@ -85,7 +85,7 @@ Built this session (newly committed), modularly per package:
 ### `@mudah-cli/animation`
 - `ProgressBar` with ETA and determinate/indeterminate modes
 - Per-tick hooks (`onStart`, `onProgress`, `onComplete`)
-- Easing presets for spinners/transitions (linear, ease-in-out, bounce, elastic)
+- Easing presets for spinners/transitions (linear, ease-in-out, bounce, elastic) ✅
 - Frame-rate independent animation clock (delta-time based)
 
 ### `@mudah-cli/ui`
