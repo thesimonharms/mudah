@@ -116,8 +116,8 @@ Built this session (newly committed), modularly per package:
 ### `@mudah-cli/tui` — widgets
 - `Breadcrumb` (trailing-ellipsis, clickable crumbs) ✅
 - `Calendar` / `DatePicker` (arrow + typing) ✅
-- `FileBrowser` (tree file picker, with `FuzzyList` filter)
-- `MenuBar` (pull-down menus, alt-underline access keys)
+- `FileBrowser` (tree file picker, with `FuzzyList` filter) ✅
+- `MenuBar` (pull-down menus, alt-underline access keys) ✅
 - `Toolbar` (iconic command strip)
 - `Tooltip` / `Popover` (anchored to a widget) ✅
 - `TextArea` (multiline `TextInput`, with scrollbars) ✅

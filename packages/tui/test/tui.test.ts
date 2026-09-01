@@ -3,8 +3,10 @@ import type { KeyEvent, MouseEvent } from '@mudah-cli/terminal';
 import {
   Container,
   DiffRenderer,
+  FileBrowser,
   Label,
   List,
+  MenuBar,
   MultiList,
   Overlay,
   Panel,
@@ -515,5 +517,98 @@ describe('mouse routing', () => {
   it('ignores clicks below every child', () => {
     const container = new Container().add(new Label('only'));
     expect(container.handleMouse(click(0, 50))).toBe(false);
+  });
+});
+
+describe('FileBrowser', () => {
+  it('loads and renders directory entries', async () => {
+    const adapter = {
+      async readdir(p: string) {
+        if (p === '.') return ['src', 'readme.md'];
+        if (p === './src') return ['index.ts'];
+        return [];
+      },
+      async isDir(p: string) {
+        return p === '.' || p === './src' || p === 'src';
+      },
+    };
+    const browser = new FileBrowser();
+    await browser.load(adapter);
+    const lines = browser.render();
+    expect(lines.length).toBe(3);
+    expect(lines.join('\n')).toContain('src');
+    expect(lines.join('\n')).toContain('readme.md');
+  });
+
+  it('navigates with arrow keys', async () => {
+    const adapter = {
+      async readdir() { return ['a.ts', 'b.ts']; },
+      async isDir() { return false; },
+    };
+    const browser = new FileBrowser();
+    await browser.load(adapter);
+    expect(browser.selectedIndex).toBe(0);
+    browser.onKey({ name: 'down', ch: '\x1b[B' });
+    expect(browser.selectedIndex).toBe(1);
+    browser.onKey({ name: 'up', ch: '\x1b[A' });
+    expect(browser.selectedIndex).toBe(0);
+  });
+
+  it('calls onSelect when a file is selected', async () => {
+    let selected = '';
+    const adapter = {
+      async readdir() { return ['file.txt']; },
+      async isDir() { return false; },
+    };
+    const browser = new FileBrowser({ onSelect: (p) => { selected = p; } });
+    await browser.load(adapter);
+    browser.onKey({ name: 'enter', ch: '\r' });
+    expect(selected).toBe('file.txt');
+  });
+});
+
+describe('MenuBar', () => {
+  it('renders menu labels', () => {
+    const bar = new MenuBar({
+      items: [
+        { label: 'File', items: [{ label: 'Open', onSelect: () => {} }] },
+        { label: 'Edit' },
+      ],
+    });
+    const lines = bar.render();
+    expect(lines[0]).toContain('File');
+    expect(lines[0]).toContain('Edit');
+  });
+
+  it('navigates left/right', () => {
+    const bar = new MenuBar({ items: [{ label: 'A' }, { label: 'B' }, { label: 'C' }] });
+    bar.onKey({ name: 'right', ch: '\x1b[C' });
+    bar.onKey({ name: 'right', ch: '\x1b[C' });
+    const lines = bar.render();
+    expect(lines[0]).toContain('[C]');
+  });
+
+  it('opens and closes dropdown', () => {
+    let called = false;
+    const bar = new MenuBar({
+      items: [
+        { label: 'File', items: [{ label: 'Save', onSelect: () => { called = true; } }] },
+      ],
+    });
+    bar.onKey({ name: 'enter', ch: '\r' }); // open
+    expect(bar.render().length).toBe(2); // header + 1 item
+    bar.onKey({ name: 'enter', ch: '\r' }); // select
+    expect(called).toBe(true);
+    expect(bar.render().length).toBe(1); // closed
+  });
+
+  it('closes on escape', () => {
+    const bar = new MenuBar({
+      items: [{ label: 'X', items: [{ label: 'Y', onSelect: () => {} }] }],
+    });
+    bar.onKey({ name: 'enter', ch: '\r' });
+    expect(bar.render().length).toBe(2);
+    bar.onKey({ name: 'escape', ch: '\x1b' });
+    expect(bar.render().length).toBe(1);
   });
 });

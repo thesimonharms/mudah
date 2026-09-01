@@ -68,4 +68,6 @@ export { Form } from './form.js';
 export { StatusBar, HelpFooter, Hyperlink } from './chrome.js';
 export { Image, type ImageOptions } from './image.js';
 export { Sparkline, Tree, VirtualList, MetricGauge, type TreeNodeData } from './extras.js';
+export { FileBrowser, type FileBrowserOptions, type FileAdapter } from './file-browser.js';
+export { MenuBar, type MenuBarItem, type MenuBarOptions } from './menu-bar.js';
 export { FuzzyList } from './fuzzy.js';
