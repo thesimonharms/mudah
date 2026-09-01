@@ -26,8 +26,6 @@ export interface ResolveSecretOptions {
   fileDir?: string;
   /** Options forwarded to the keyring driver for `keyring:` refs. */
   keyring?: KeyringDriverOptions;
-  /** When set, `env:`/`file:`/`keyring:` still pick a dedicated driver. */
-  store?: SecretStore;
 }
 
 export type KeyringSpawnResult = {
