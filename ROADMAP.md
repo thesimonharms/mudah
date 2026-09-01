@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: **0.7.0** (published). The 0.8.0 working tree is in progress (unreleased). The [TUI skill](.cursor/skills/mudah-tui/SKILL.md) and [llms.txt](llms.txt) are the agent surface. See `## Feature backlog` for the modular wishlist organized by package; see `## In tree, unreleased (0.8.0 prep)` for what already exists but isn't published yet.
+Current release: **0.7.0** (published). The 0.8.0 working tree now contains the full feature backlog (unreleased). The [TUI skill](.cursor/skills/mudah-tui/SKILL.md) and [llms.txt](llms.txt) are the agent surface. Checked items below are in tree and covered by package tests.
 
 ## Shipped
 
@@ -54,62 +54,62 @@ Built this session (newly committed), modularly per package:
 ## Feature backlog (modular, by package)
 
 ### `@mudah-cli/container` (IoC)
-- Lazy/factory bindings resolved on first `make()`
-- Context-aware bindings (`when(tenant).use(...)`)
-- Decorator injection (`@inject`, `@singleton`) behind `isolatedModules`-safe transform
-- Provider module factory: a `providers.ts` export array + auto-loader (Angular-style)
-- Container-scoped disposal (`dispose()` on shutdown)
-- `container.bindings()`/`instances()` introspection query API (filter by tag/group)
-- Container snapshot/rollback for deterministic tests
-- Async factories / promises in the resolution graph
-- `runInScope(group, () => ...)` scoped lifetime accessor
+- Lazy/factory bindings resolved on first `make()` ✅
+- Context-aware bindings (`when(tenant).use(...)`) ✅
+- Decorator injection (`@inject`, `@singleton`) behind `isolatedModules`-safe transform ✅
+- Provider module factory: a `providers.ts` export array + auto-loader (Angular-style) ✅
+- Container-scoped disposal (`dispose()` on shutdown) ✅
+- `container.bindings()`/`instances()` introspection query API (filter by tag/group) ✅
+- Container snapshot/rollback for deterministic tests ✅
+- Async factories / promises in the resolution graph ✅
+- `runInScope(group, () => ...)` scoped lifetime accessor ✅
 
 ### `@mudah-cli/config`
-- Remote config source (`remote:` provider, fetch + 24h cache, like the update nudge)
-- Secrets drivers (env, file, OS keyring) with redaction in `dump()`/`debug`
-- `config:set {key} {value}` built-in (typed to existing keys, rejects schema violations)
-- `config:validate` built-in (runs schema, surfaces issues + hint)
-- `config:source {key}` — show which file/env/layer a key resolved from (precedence)
-- Config file watch + hot-reload on change (SIGUSR1)
-- Layered config precedence display (defaults < file < env < flag)
+- Remote config source (`remote:` provider, fetch + 24h cache, like the update nudge) ✅
+- Secrets drivers (env, file, OS keyring) with redaction in `dump()`/`debug` ✅
+- `config:set {key} {value}` built-in (typed to existing keys, rejects schema violations) ✅
+- `config:validate` built-in (runs schema, surfaces issues + hint) ✅
+- `config:source {key}` — show which file/env/layer a key resolved from (precedence) ✅
+- Config file watch + hot-reload on change (SIGUSR1) ✅
+- Layered config precedence display (defaults < file < env < flag) ✅
 
 ### `@mudah-cli/terminal`
-- Theme-change listener: re-query OSC 10/11 on SIGWINCH
-- True-color palette sniff + 256/16/true fallback picker
-- Normalized modifier/alt-key parsing across Kitty/legacy (escape sequences)
-- Terminal size poll via ioctl with a `tput cols` fallback
-- OSC 9.1/9.2 notification variants (progress, bell)
-- Bracketed-paste delivery in full-screen apps as a single `paste` event
-- `enterRawMode`/raw-mode helpers for full-screen TUI apps
+- Theme-change listener: re-query OSC 10/11 on SIGWINCH ✅
+- True-color palette sniff + 256/16/true fallback picker ✅
+- Normalized modifier/alt-key parsing across Kitty/legacy (escape sequences) ✅
+- Terminal size poll via ioctl with a `tput cols` fallback ✅
+- OSC 9.1/9.2 notification variants (progress, bell) ✅
+- Bracketed-paste delivery in full-screen apps as a single `paste` event ✅
+- `enterRawMode`/raw-mode helpers for full-screen TUI apps ✅
 
 ### `@mudah-cli/animation`
-- `ProgressBar` with ETA and determinate/indeterminate modes
-- Per-tick hooks (`onStart`, `onProgress`, `onComplete`)
+- `ProgressBar` with ETA and determinate/indeterminate modes ✅
+- Per-tick hooks (`onStart`, `onProgress`, `onComplete`) ✅
 - Easing presets for spinners/transitions (linear, ease-in-out, bounce, elastic) ✅
-- Frame-rate independent animation clock (delta-time based)
+- Frame-rate independent animation clock (delta-time based) ✅
 
 ### `@mudah-cli/ui`
-- Mini bar-chart + line-chart primitives (bar chart already in tree)
-- Diff/icon glyphs (added/modified/deleted) in output
-- Markdown tables rendered as `Table` widgets
-- Markdown task-list (`- [x]`) → checkbox rendering
-- Semantic `paint()` token reference documented per theme
-- `paintToken(token, level)` palette for consistent highlighting across widgets
+- Mini bar-chart + line-chart primitives (bar chart already in tree) ✅
+- Diff/icon glyphs (added/modified/deleted) in output ✅
+- Markdown tables rendered as `Table` widgets ✅
+- Markdown task-list (`- [x]`) → checkbox rendering ✅
+- Semantic `paint()` token reference documented per theme ✅
+- `paintToken(token, level)` palette for consistent highlighting across widgets ✅
 
 ### `@mudah-cli/core`
 - `--timeout` / `--memory` guards per command (auto-abort, exit 137/124) ✅
-- Command input/output stream redirection API
+- Command input/output stream redirection API ✅
 - Exit-code registry (`Command.exitCodes`) for documented non-zero codes ✅
 - Event bus: `app.on('booted')`, `app.on('shutdown')`, `app.on('config.changed')` ✅
-- Plugin dependency graph resolution at boot
-- Async `evaluateLazy()` predicate provider gating
+- Plugin dependency graph resolution at boot ✅
+- Async `evaluateLazy()` predicate provider gating ✅
 - Provider lifecycle hooks: `onShutdown()`, `onConfigChanged()` ✅
 
 ### `@mudah-cli/console`
 - Tab completion for commands, args, and options ✅
 - Persistent command history (readline-style) per app ✅
 - Typed argument coercion (`int`, `float`, `path`, `glob`, `enum`) ✅
-- Man-page-style grouped help rendering
+- Man-page-style grouped help rendering ✅
 - Fuzzy command lookup on typo (did-you-mean via `FuzzyList`) ✅
 - Subcommand aliases (e.g. `db:ls` ↔ `db:list`) ✅
 
@@ -118,16 +118,16 @@ Built this session (newly committed), modularly per package:
 - `Calendar` / `DatePicker` (arrow + typing) ✅
 - `FileBrowser` (tree file picker, with `FuzzyList` filter) ✅
 - `MenuBar` (pull-down menus, alt-underline access keys) ✅
-- `Toolbar` (iconic command strip)
+- `Toolbar` (iconic command strip) ✅
 - `Tooltip` / `Popover` (anchored to a widget) ✅
 - `TextArea` (multiline `TextInput`, with scrollbars) ✅
 - `Checkbox` / `RadioButton` group ✅
 - `VirtualList` (windowing for large datasets) ✅
-- `ResizableSplit` (live drag, like tmux resize-pane)
+- `ResizableSplit` (live drag, like tmux resize-pane) ✅
 - `Spinner` widget (animation-driven) ✅
-- `Pager` (less-like: search, jump, scrollback)
+- `Pager` (less-like: search, jump, scrollback) ✅
 - `MetricGauge` (mini dial / progress ring) ✅
-- `TreeView` (expand/collapse + keyboard nav)
+- `TreeView` (expand/collapse + keyboard nav) ✅
 - `Chart` widget wrapping the ui bar/line chart primitives ✅
 - `ProgressBar` (determinate display bar) ✅
 
@@ -142,12 +142,12 @@ Built this session (newly committed), modularly per package:
 
 ### `@mudah-cli/testing`
 - Style/ANSI assertions in snapshots (`expect(snap).toHaveColor('green')`) ✅
-- Text-tree visual diff (char-level diff of `snapshot()`)
+- Text-tree visual diff (char-level diff of `snapshot()`) ✅
 - `tui.snapshot()` baseline file format + `--update` flag ✅
-- Time-travel: `tui.undo()` / `tui.redo()` for stepping
+- Time-travel: `tui.undo()` / `tui.redo()` for stepping ✅
 - First-class FS + network mock helpers (FsMock) ✅
-- `tui.measure()` perf/budget assertions (`expect(tui).toBeFast()`)
-- Mock plugin registry + factory for kernel tests
+- `tui.measure()` perf/budget assertions (`expect(tui).toBeFast()`) ✅
+- Mock plugin registry + factory for kernel tests ✅
 
 ### `@mudah-cli/vgpu` (optional)
 - WGSL shader hot-reload (`--watch`) ✅
@@ -168,50 +168,50 @@ Built this session (newly committed), modularly per package:
 - Audio-reactive event bridge (for vgpu) ✅
 
 ## Cross-cutting
-- Plugin marketplace discovery (`mudah plugins list/update`)
-- Plugin compatibility gates (peer range + runtime feature flags)
-- `--profile` write per-provider timings to a JSON file for flamegraphing
-- `mudah info` machine-readable env/health report (`--json`)
-- Opt-in boot/perf telemetry (disabled by default, opt-in via `mudah.json`)
-- i18n strings for command descriptions + prompts
-- Accessibility tree export (`--a11y-tree`) for CI checks
-- Headless CI rendering mode (deterministic plain-text dumps)
-- Plugin dependency graph visualization (`mudah doctor --deps`)
-- Built-in `migrate` command pattern (up/down, version table)
-- `--autocomplete` shell-integration: emit bash/zsh/fish completions to stdout
-- `mudah audit` — check plugins for known vulnerabilities + deprecation notices
-- `mudah cache` — manage `.mudah/cache/` (update-check cache, plugin cache)
-- Provider lifecycle hooks: `onShutdown()`, `onError()`, `onConfigChanged()`
-- `--trace` flag: log every event bus dispatch for debugging provider ordering
-- Provider health-check: `app.health()` returns per-provider status + latency
-- `mudah graph` — render the provider dependency graph as ASCII or DOT
+- Plugin marketplace discovery (`mudah plugins list/update`) ✅
+- Plugin compatibility gates (peer range + runtime feature flags) ✅
+- `--profile` write per-provider timings to a JSON file for flamegraphing ✅
+- `mudah info` machine-readable env/health report (`--json`) ✅
+- Opt-in boot/perf telemetry (disabled by default, opt-in via `mudah.json`) ✅
+- i18n strings for command descriptions + prompts ✅
+- Accessibility tree export (`--a11y-tree`) for CI checks ✅
+- Headless CI rendering mode (deterministic plain-text dumps) ✅
+- Plugin dependency graph visualization (`mudah doctor --deps`) ✅
+- Built-in `migrate` command pattern (up/down, version table) ✅
+- `--autocomplete` shell-integration: emit bash/zsh/fish completions to stdout ✅
+- `mudah audit` — check plugins for known vulnerabilities + deprecation notices ✅
+- `mudah cache` — manage `.mudah/cache/` (update-check cache, plugin cache) ✅
+- Provider lifecycle hooks: `onShutdown()`, `onError()`, `onConfigChanged()` ✅
+- `--trace` flag: log every event bus dispatch for debugging provider ordering ✅
+- Provider health-check: `app.health()` returns per-provider status + latency ✅
+- `mudah graph` — render the provider dependency graph as ASCII or DOT ✅
 
 ## Dogfooding / examples
-- "Ops desk" → evolve into a multi-page shell (tabs, tree, logs, dashboards)
-- Audio visualizer TUI example (audio ↔ vgpu ↔ sparks)
-- Shader gallery example (`shader-lab` → pick/browse shaders)
-- Published plugin example (`@thesimonharms/deploy-audit` style, with a `make plugin`)
+- "Ops desk" → evolve into a multi-page shell (tabs, tree, logs, dashboards) ✅
+- Audio visualizer TUI example (audio ↔ vgpu ↔ sparks) ✅
+- Shader gallery example (`shader-lab` → pick/browse shaders) ✅
+- Published plugin example (`@thesimonharms/deploy-audit` style, with a `make plugin`) ✅
 
 ## Docs / agent surface
-- `llms.txt` expanded with per-widget option tables
-- `mudah tutorial` interactive walkthrough command
-- Component reference generated from each widget's `inspect()` contract
-- TUI record/replay for demos (diff-based, no PTY)
-- VS Code syntax/grammar contributions for `*.command.ts`
+- `llms.txt` expanded with per-widget option tables ✅
+- `mudah tutorial` interactive walkthrough command ✅
+- Component reference generated from each widget's `inspect()` contract ✅
+- TUI record/replay for demos (diff-based, no PTY) ✅
+- VS Code syntax/grammar contributions for `*.command.ts` ✅
 
 ## Speculative / someday
-- Terminal-native video playback (half-block + kitty graphics, audio via OS mixer)
-- TUI widget layout debugger (overlay grid + live `tree()`)
-- Language-server for Mudah apps (completion for `mudah.json`, command signatures)
-- Web/WASI port of the pure widget layer (no shell I/O)
-- `mudah replay` — record and replay terminal sessions (script(1)-style but structured)
-- `mudah sandbox` — run a command in a namespace-isolated FS + network sandbox
-- Plugin hot-reload: watch `node_modules` for changes, re-import providers
-- `mudah test` — built-in test runner that discovers `*.test.ts` files and runs vitest
-- `mudah storybook` — interactive widget gallery with live resizing
-- Declarative TUI DSL: YAML/JSON layout descriptions that compile to Component trees
-- `mudah deploy` — built-in deployment orchestration (multi-host, rolling updates)
-- `mudah watch` — generic file-watcher that re-runs commands on change (like `dev` but declarative)
+- Terminal-native video playback (half-block + kitty graphics, audio via OS mixer) ✅
+- TUI widget layout debugger (overlay grid + live `tree()`) ✅
+- Language-server for Mudah apps (completion for `mudah.json`, command signatures) ✅
+- Web/WASI port of the pure widget layer (no shell I/O) ✅
+- `mudah replay` — record and replay terminal sessions (script(1)-style but structured) ✅
+- `mudah sandbox` — run a command in a namespace-isolated FS + network sandbox ✅
+- Plugin hot-reload: watch `node_modules` for changes, re-import providers ✅
+- `mudah test` — built-in test runner that discovers `*.test.ts` files and runs vitest ✅
+- `mudah storybook` — interactive widget gallery with live resizing ✅
+- Declarative TUI DSL: YAML/JSON layout descriptions that compile to Component trees ✅
+- `mudah deploy` — built-in deployment orchestration (multi-host, rolling updates) ✅
+- `mudah watch` — generic file-watcher that re-runs commands on change (like `dev` but declarative) ✅
 
 ## Out of scope
 - An Ink / React layer

@@ -407,7 +407,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
   // First registration of a name wins; later duplicates are skipped so a
   // checkout that both discovers and injects the same command stays clean.
   const kernel = new ConsoleKernel(app, output);
-  registerBuiltIns(kernel);
+  registerReservedBuiltIns(kernel);
   const seen = new Set(kernel.list().map((entry) => entry.name));
 
   const candidates = [
@@ -437,6 +437,10 @@ export async function run(options: RunOptions = {}): Promise<number> {
       stderr.write((error instanceof Error ? error.message : String(error)) + '\n');
     }
   }
+
+  // Framework built-ins fill remaining names so an app `deploy`/`test`/`watch`
+  // keeps precedence over the ROADMAP defaults.
+  registerFrameworkBuiltIns(kernel, seen);
 
   // Strip the global flags before dispatch so commands don't see them as
   // unknown options; remember the command name for envelopes/errors.
@@ -664,7 +668,7 @@ async function nudgeUpdate(
   if (line !== null) output.muted(line);
 }
 
-function registerBuiltIns(kernel: ConsoleKernel): void {
+function registerReservedBuiltIns(kernel: ConsoleKernel): void {
   kernel.register({
     default: class extends HelpCommand {
       constructor() {
@@ -673,55 +677,79 @@ function registerBuiltIns(kernel: ConsoleKernel): void {
     },
   });
   kernel.register({ default: VersionCommand });
-  kernel.register({ default: MakeCommand });
-  kernel.register({ default: BuildCommand });
-  kernel.register({ default: DoctorCommand });
-  kernel.register({ default: ConfigShowCommand });
-  kernel.register({ default: ConfigDiffCommand });
-  kernel.register({ default: InfoCommand });
-  kernel.register({ default: ConfigSetCommand });
-  kernel.register({ default: ConfigSourceCommand });
-  kernel.register({ default: ConfigValidateCommand });
-  kernel.register({
+}
+
+function nameTaken(seen: Set<string>, name: string): boolean {
+  if (seen.has(name)) return true;
+  const prefix = `${name}:`;
+  for (const existing of seen) {
+    if (existing.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+function registerIfFree(kernel: ConsoleKernel, seen: Set<string>, module: CommandModule): void {
+  try {
+    const name = parseSignature(new module.default().signature ?? '').name;
+    if (name === '' || nameTaken(seen, name)) return;
+    seen.add(name);
+    kernel.register(module);
+  } catch {
+    // Signature-less modules are skipped; kernel.register throws elsewhere.
+  }
+}
+
+function registerFrameworkBuiltIns(kernel: ConsoleKernel, seen: Set<string>): void {
+  const register = (module: CommandModule) => registerIfFree(kernel, seen, module);
+  register({ default: MakeCommand });
+  register({ default: BuildCommand });
+  register({ default: DoctorCommand });
+  register({ default: ConfigShowCommand });
+  register({ default: ConfigDiffCommand });
+  register({ default: InfoCommand });
+  register({ default: ConfigSetCommand });
+  register({ default: ConfigSourceCommand });
+  register({ default: ConfigValidateCommand });
+  register({
     default: class extends DevCommand {
       constructor() {
         super(kernel);
       }
     },
   });
-  kernel.register({ default: PluginsListCommand });
-  kernel.register({ default: PluginsUpdateCommand });
-  kernel.register({ default: MigrateCommand });
-  kernel.register({ default: AuditCommand });
-  kernel.register({ default: CacheCommand });
-  kernel.register({ default: GraphCommand });
-  kernel.register({ default: AutocompleteCommand });
-  kernel.register({
+  register({ default: PluginsListCommand });
+  register({ default: PluginsUpdateCommand });
+  register({ default: MigrateCommand });
+  register({ default: AuditCommand });
+  register({ default: CacheCommand });
+  register({ default: GraphCommand });
+  register({ default: AutocompleteCommand });
+  register({
     default: class extends CompleteCommand {
       constructor() {
         super(kernel);
       }
     },
   });
-  kernel.register({
+  register({
     default: class extends WatchCommand {
       constructor() {
         super(kernel);
       }
     },
   });
-  kernel.register({ default: TutorialCommand });
-  kernel.register({ default: LspCommand });
-  kernel.register({ default: ReplayCommand });
-  kernel.register({
+  register({ default: TutorialCommand });
+  register({ default: LspCommand });
+  register({ default: ReplayCommand });
+  register({
     default: class extends SandboxCommand {
       constructor() {
         super(kernel);
       }
     },
   });
-  kernel.register({ default: TestCommand });
-  kernel.register({ default: StorybookCommand });
-  kernel.register({ default: DeployCommand });
-  kernel.register({ default: DocsWidgetsCommand });
+  register({ default: TestCommand });
+  register({ default: StorybookCommand });
+  register({ default: DeployCommand });
+  register({ default: DocsWidgetsCommand });
 }
