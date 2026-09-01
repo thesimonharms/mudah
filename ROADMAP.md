@@ -97,7 +97,7 @@ Built this session (newly committed), modularly per package:
 - `paintToken(token, level)` palette for consistent highlighting across widgets
 
 ### `@mudah-cli/core`
-- `--timeout` / `--memory` guards per command (auto-abort, exit 137/124)
+- `--timeout` / `--memory` guards per command (auto-abort, exit 137/124) ✅
 - Command input/output stream redirection API
 - Exit-code registry (`Command.exitMap`) for documented non-zero codes
 - Event bus: `app.on('booted')`, `on('shutdown')`, `on('config:changed')`

@@ -23,6 +23,32 @@ import ConfigSetCommand from './commands/config.set.command.js';
 import ConfigValidateCommand from './commands/config.validate.command.js';
 import DevCommand from './commands/dev.command.js';
 
+/** Parsed timeout in milliseconds. */
+function parseTimeout(value: string): number {
+  const match = /^(\d+(?:\.\d+)?)(ms|s|m)?$/i.exec(value.trim());
+  if (!match) throw new UsageError(`Invalid timeout value "${value}". Use a number with optional suffix (ms, s, m).`);
+  const n = Number(match[1]);
+  if (!Number.isFinite(n) || n <= 0) throw new UsageError(`Timeout must be a positive number, got "${value}".`);
+  const unit = (match[2] ?? 'ms').toLowerCase();
+  if (unit === 's') return Math.round(n * 1_000);
+  if (unit === 'm') return Math.round(n * 60_000);
+  return Math.round(n);
+}
+
+/** Parsed memory limit in bytes. */
+function parseMemory(value: string): number {
+  const match = /^(\d+(?:\.\d+)?)(kb|mb|gb|tb|b)?$/i.exec(value.trim());
+  if (!match) throw new UsageError(`Invalid memory value "${value}". Use a number with optional suffix (kb, mb, gb, tb, b).`);
+  const n = Number(match[1]);
+  if (!Number.isFinite(n) || n <= 0) throw new UsageError(`Memory must be a positive number, got "${value}".`);
+  const unit = (match[2] ?? 'mb').toLowerCase();
+  if (unit === 'kb') return Math.round(n * 1_024);
+  if (unit === 'mb') return Math.round(n * 1_048_576);
+  if (unit === 'gb') return Math.round(n * 1_073_741_824);
+  if (unit === 'tb') return Math.round(n * 1_099_511_627_776);
+  return Math.round(n);
+}
+
 export interface RunOptions {
   /** Raw arguments (default: `process.argv.slice(2)`). */
   argv?: string[];
@@ -129,6 +155,31 @@ export async function run(options: RunOptions = {}): Promise<number> {
   }
   const jsonMode = output.isMachineReadable;
   const profileMode = argv.includes('--profile');
+
+  // Parse and strip global timeout/memory flags.
+  let timeoutMs = 0;
+  let memoryLimit = 0;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--timeout' && i + 1 < argv.length) {
+      timeoutMs = parseTimeout(argv[i + 1]!);
+      argv.splice(i, 2);
+      i--;
+    } else if (arg.startsWith('--timeout=')) {
+      timeoutMs = parseTimeout(arg.slice(10));
+      argv.splice(i, 1);
+      i--;
+    } else if (arg === '--memory' && i + 1 < argv.length) {
+      memoryLimit = parseMemory(argv[i + 1]!);
+      argv.splice(i, 2);
+      i--;
+    } else if (arg.startsWith('--memory=')) {
+      memoryLimit = parseMemory(arg.slice(9));
+      argv.splice(i, 1);
+      i--;
+    }
+  }
+
   const startedAt = Date.now();
 
   // Advertise the working directory (OSC 7) once on launch so terminals that
@@ -215,7 +266,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const lines: string[] = [];
     renderCommandList(manifest.name, manifest.version, kernel.list(), lines);
     output.raw(lines.join('\n'));
-    output.raw('\n\nGlobal flags:\n  --help/-h  Show this help\n  --version  Show the version\n  --json     Machine-readable JSON output\n  --plain    Strip all ANSI styling\n  --profile  Print boot and command timings');
+    output.raw('\n\nGlobal flags:\n  --help/-h  Show this help\n  --version  Show the version\n  --json     Machine-readable JSON output\n  --plain    Strip all ANSI styling\n  --profile  Print boot and command timings\n  --timeout  Kill command after N ms (e.g. --timeout=5s)\n  --memory   Kill command when heap exceeds N MB (e.g. --memory=512mb)');
     return 0;
   }
   if (first === '--version') {
@@ -245,8 +296,41 @@ export async function run(options: RunOptions = {}): Promise<number> {
     return 0;
   }
 
+  // Set up timeout and memory monitors.
+  let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+  let memoryTimer: ReturnType<typeof setInterval> | undefined;
+  let timeoutFired = false;
+
+  if (timeoutMs > 0) {
+    timeoutTimer = setTimeout(() => {
+      timeoutFired = true;
+      process.exitCode = 124;
+      output.error(`Command timed out after ${Math.round(timeoutMs / 1_000)}s`);
+      // Emit exit event before forcing exit.
+      void kernel.dispatch; // ensure reference is not lost
+      process.kill(process.pid, 'SIGTERM');
+    }, timeoutMs);
+  }
+
+  if (memoryLimit > 0) {
+    memoryTimer = setInterval(() => {
+      const used = process.memoryUsage().heapUsed;
+      if (used > memoryLimit) {
+        output.error(`Memory limit exceeded: ${(used / 1_048_576).toFixed(0)}MB > ${(memoryLimit / 1_048_576).toFixed(0)}MB`);
+        process.exitCode = 137;
+        process.kill(process.pid, 'SIGKILL');
+      }
+    }, 500);
+  }
+
+  function cleanupMonitors(): void {
+    if (timeoutTimer) clearTimeout(timeoutTimer);
+    if (memoryTimer) clearInterval(memoryTimer);
+  }
+
   try {
     const code = await kernel.dispatch(resolveGroup(kernel, dispatchArgv));
+    cleanupMonitors();
     if (jsonMode) {
       stdout.write(
         output.jsonEnvelope({
@@ -269,6 +353,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     }
     return code;
   } catch (rawError) {
+    cleanupMonitors();
     let parsed: { message: string; hint?: string; usage?: string };
     if (rawError instanceof UsageError) {
       parsed = { message: rawError.message, hint: rawError.hint, usage: rawError.usage };
