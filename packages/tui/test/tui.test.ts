@@ -535,9 +535,17 @@ describe('FileBrowser', () => {
     const browser = new FileBrowser();
     await browser.load(adapter);
     const lines = browser.render();
-    expect(lines.length).toBe(3);
+    expect(lines.length).toBe(2);
     expect(lines.join('\n')).toContain('src');
     expect(lines.join('\n')).toContain('readme.md');
+    expect(lines.join('\n')).not.toContain('index.ts');
+    browser.onKey({ name: 'space' });
+    for (let i = 0; i < 20; i++) {
+      if (browser.render().join('\n').includes('index.ts')) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(browser.render().join('\n')).toContain('index.ts');
+    expect(browser.render().join('\n')).toContain('▼');
   });
 
   it('navigates with arrow keys', async () => {
@@ -576,8 +584,8 @@ describe('MenuBar', () => {
       ],
     });
     const lines = bar.render();
-    expect(lines[0]).toContain('File');
-    expect(lines[0]).toContain('Edit');
+    expect(lines[0]).toContain('F\u0332ile');
+    expect(lines[0]).toContain('E\u0332dit');
   });
 
   it('navigates left/right', () => {
@@ -585,7 +593,19 @@ describe('MenuBar', () => {
     bar.onKey({ name: 'right', ch: '\x1b[C' });
     bar.onKey({ name: 'right', ch: '\x1b[C' });
     const lines = bar.render();
-    expect(lines[0]).toContain('[C]');
+    expect(lines[0]).toContain('C');
+    expect(lines[0]).toMatch(/\[C/);
+  });
+
+  it('opens a menu from an alt access key', () => {
+    const bar = new MenuBar({
+      items: [
+        { label: 'File', items: [{ label: 'Open', onSelect: () => undefined }] },
+        { label: 'Edit' },
+      ],
+    });
+    expect(bar.onKey({ name: 'f', ch: 'f', alt: true })).toBe(true);
+    expect(bar.render().length).toBe(2);
   });
 
   it('opens and closes dropdown', () => {

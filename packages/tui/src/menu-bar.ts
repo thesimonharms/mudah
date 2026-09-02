@@ -28,7 +28,10 @@ export class MenuBar extends BaseComponent {
 
   render(): string[] {
     const header = this.items
-      .map((item, i) => (i === this.selected ? `[${item.label}]` : ` ${item.label} `))
+      .map((item, i) => {
+        const marked = accessLabel(item.label);
+        return i === this.selected ? `[${marked}]` : ` ${marked} `;
+      })
       .join('│');
     const lines: string[] = [header];
     if (this.openMenu >= 0) {
@@ -68,7 +71,7 @@ export class MenuBar extends BaseComponent {
           this.openMenu = -1;
           return true;
         default:
-          return false;
+          return this.matchAccessKey(event);
       }
     }
     switch (event.name) {
@@ -87,7 +90,24 @@ export class MenuBar extends BaseComponent {
         this.openMenu = -1;
         return true;
       default:
+        if (this.matchAccessKey(event)) return true;
         return false;
     }
   }
+
+  private matchAccessKey(event: KeyEvent): boolean {
+    if (!event.alt || event.ch === undefined) return false;
+    const ch = event.ch.toLowerCase();
+    const idx = this.items.findIndex((item) => item.label[0]?.toLowerCase() === ch);
+    if (idx < 0) return false;
+    this.selected = idx;
+    this.openMenu = idx;
+    this.openIndex = 0;
+    return true;
+  }
+}
+
+function accessLabel(label: string): string {
+  if (label.length === 0) return label;
+  return `${label[0] ?? ''}\u0332${label.slice(1)}`;
 }

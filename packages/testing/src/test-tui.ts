@@ -1,8 +1,10 @@
 import type { KeyEvent, MouseEvent } from '@mudah-cli/terminal';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { dumpTree, type Layout, type TreeNode } from '@mudah-cli/tui';
+import { blitLines, dumpTree, ScreenBuffer, type Layout, type TreeNode } from '@mudah-cli/tui';
+import { paint, sleekDark, type Theme } from '@mudah-cli/ui';
 import { diffSnapshots } from './visual-diff.js';
+import { assertHasColor, type ColorExpectation } from './snapshot-assert.js';
 
 export interface TestTuiOptions {
   cols?: number;
@@ -166,9 +168,21 @@ export class TestTui {
     return this.liveFrame();
   }
 
-  snapshot(): string {
+  snapshot(options?: { color?: boolean }): string {
+    if (options?.color === true) return this.colorSnapshot();
     if (this.replayFrame !== null) return this.replayFrame;
     return this.liveSnapshot();
+  }
+
+  /** Assert a fragment in the color snapshot is painted with `hex`. */
+  toHaveColor(expectation: ColorExpectation, theme: Theme = sleekDark): this {
+    assertHasColor(this.colorSnapshot(theme), expectation);
+    return this;
+  }
+
+  /** Alias of {@link expectFast}. */
+  toBeFast(budgetMs: number): this {
+    return this.expectFast(budgetMs);
   }
 
   tree(): TreeNode {
@@ -184,7 +198,7 @@ export class TestTui {
     const snapshotPath = join(this.snapshotDir, `${name}.snapshot`);
     const current = this.snapshot();
 
-    if (process.env['UPDATE_SNAPSHOT'] === '1') {
+    if (process.env['UPDATE_SNAPSHOT'] === '1' || process.argv.includes('--update')) {
       mkdirSync(dirname(snapshotPath), { recursive: true });
       writeFileSync(snapshotPath, current, 'utf8');
       return;
@@ -247,6 +261,36 @@ export class TestTui {
 
   private liveSnapshot(): string {
     return this.liveFrame().join('\n').replace(/[ \t]+\n/g, '\n').trimEnd();
+  }
+
+  private colorSnapshot(theme: Theme = sleekDark): string {
+    this.root.resize(this.cols, this.rows);
+    const buffer = new ScreenBuffer(this.cols, this.rows);
+    blitLines(buffer, this.root.render());
+    const lines: string[] = [];
+    for (let y = 0; y < this.rows; y++) {
+      let line = '';
+      let run = '';
+      let style = '';
+      const flush = (): void => {
+        if (run.length === 0) return;
+        const hex = style === '' ? undefined : theme.colors[style as keyof Theme['colors']];
+        line += hex ? paint(hex, run, 24) : run;
+        run = '';
+      };
+      for (let x = 0; x < this.cols; x++) {
+        const cell = buffer.getCell(x, y);
+        if (cell.char === '') continue;
+        if (cell.style !== style) {
+          flush();
+          style = cell.style;
+        }
+        run += cell.char;
+      }
+      flush();
+      lines.push(line);
+    }
+    return lines.join('\n').replace(/[ \t]+\n/g, '\n').trimEnd();
   }
 }
 

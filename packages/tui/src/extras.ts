@@ -203,6 +203,7 @@ export class MetricGauge extends BaseComponent {
     private width = 20,
   ) {
     super();
+    this.value = Math.max(0, Math.min(1, value));
   }
 
   setValue(value: number): void {
@@ -215,7 +216,8 @@ export class MetricGauge extends BaseComponent {
     const bar = '█'.repeat(filled) + '░'.repeat(empty);
     const pct = Math.round(this.value * 100);
     const pad = this.label.length > 0 ? this.label + ' ' : '';
-    return [`${pad}${bar} ${pct}%`];
+    const ring = ['○', '◔', '◑', '◕', '●'][Math.min(4, Math.round(this.value * 4))] ?? '○';
+    return [`${pad}${ring} ${bar} ${pct}%`];
   }
 
   inspect(): { role: string; name?: string; value?: unknown } {

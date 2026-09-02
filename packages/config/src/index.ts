@@ -13,6 +13,7 @@ export { redactSecrets, REDACT_KEYS, type RedactOptions } from './redact.js';
 export {
   loadRemoteConfig,
   resolveRemoteUrl,
+  assertRemoteUrl,
   REMOTE_CONFIG_CACHE_FILE,
   REMOTE_CONFIG_TTL_MS,
   type LoadRemoteConfigOptions,

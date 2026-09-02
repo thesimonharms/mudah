@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Application, ServiceProvider, UsageError, type MudahManifest } from '@mudah-cli/core';
 import { Output, resolveTheme, type OutputOptions } from '@mudah-cli/ui';
 import {
@@ -372,5 +375,22 @@ describe('command history', () => {
     const kernel = kernelFor(app, holder);
     await kernel.dispatch(['code']);
     expect(kernel.history).toContain('code');
+  });
+
+  it('persists history to a file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mudah-hist-'));
+    const file = join(dir, 'history');
+    try {
+      const app = makeApp();
+      const holder = makeOutput();
+      const kernel = new ConsoleKernel(app, holder.output, { historyFile: file });
+      kernel.register({ default: GreetCommand });
+      await kernel.dispatch(['greet', 'world']);
+      expect(readFileSync(file, 'utf8')).toContain('greet world');
+      const again = new ConsoleKernel(app, holder.output, { historyFile: file });
+      expect(again.history).toEqual(['greet world']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

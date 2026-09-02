@@ -93,6 +93,7 @@ export class Program {
   private exitRaw: (() => void) | null = null;
   private dataListener: ((chunk: Buffer | string) => void) | null = null;
   private resolveRun: ((code: number) => void) | null = null;
+  private lastTickAt = 0;
   private readonly onResize = (): void => {
     this.renderer.reset();
     this.requestFrame();
@@ -166,6 +167,7 @@ export class Program {
 
       const code = await new Promise<number>((resolve) => {
         this.resolveRun = resolve;
+        this.lastTickAt = Date.now();
         this.timer = setInterval(() => this.tick(), this.frameMs);
         this.paint();
       });
@@ -183,6 +185,10 @@ export class Program {
   }
 
   private tick(): void {
+    const now = Date.now();
+    const dt = this.lastTickAt === 0 ? this.frameMs : now - this.lastTickAt;
+    this.lastTickAt = now;
+    this.container?.tick(dt);
     this.paint();
   }
 

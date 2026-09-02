@@ -1,10 +1,25 @@
+import { spawnSync } from 'node:child_process';
+
 export interface DecodedMp3 {
   readonly sampleRate: number;
   readonly channels: number;
-  /** Interleaved PCM. Silence of the estimated duration (header-only decode). */
+  /** Interleaved PCM. Real samples when `decoded` is true, else silence of the estimated duration. */
   readonly samples: Float32Array;
   readonly duration: number;
   readonly frames: number;
+  /** True when an OS decoder (ffmpeg) produced PCM. */
+  readonly decoded: boolean;
+}
+
+export type Mp3Spawn = (
+  command: string,
+  args: readonly string[],
+  input: Uint8Array,
+) => Uint8Array | null;
+
+export interface DecodeMp3Options {
+  /** Injected process runner. Tests stub ffmpeg. */
+  spawn?: Mp3Spawn;
 }
 
 /** [unused, Layer I, Layer II, Layer III] kbps. */
@@ -58,11 +73,56 @@ export function looksLikeMp3(bytes: Uint8Array): boolean {
 }
 
 /**
- * Scan MPEG frame headers and return silence PCM whose length matches the
- * estimated duration. A full Huffman decoder is out of scope; duration and
- * format come from the headers.
+ * Decode MP3 to PCM. Tries `ffmpeg` for real samples; falls back to
+ * header-scanned silence when no decoder is available.
  */
-export function decodeMp3(buffer: Uint8Array): DecodedMp3 {
+export function decodeMp3(buffer: Uint8Array, options: DecodeMp3Options = {}): DecodedMp3 {
+  const headers = scanMp3(buffer);
+  const spawn =
+    options.spawn ??
+    (process.env['VITEST'] !== undefined ? (() => null) : defaultFfmpegSpawn);
+  const pcm = spawn('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-i',
+    'pipe:0',
+    '-f',
+    'f32le',
+    '-ac',
+    String(headers.channels),
+    '-ar',
+    String(headers.sampleRate),
+    'pipe:1',
+  ], buffer);
+  if (pcm !== null && pcm.byteLength >= 4) {
+    const aligned = pcm.byteLength - (pcm.byteLength % 4);
+    const samples = new Float32Array(pcm.buffer, pcm.byteOffset, aligned / 4);
+    return {
+      sampleRate: headers.sampleRate,
+      channels: headers.channels,
+      samples,
+      duration: samples.length / headers.channels / headers.sampleRate,
+      frames: headers.frames,
+      decoded: true,
+    };
+  }
+  return {
+    sampleRate: headers.sampleRate,
+    channels: headers.channels,
+    samples: new Float32Array(headers.samplesPerChannel * headers.channels),
+    duration: headers.samplesPerChannel / headers.sampleRate,
+    frames: headers.frames,
+    decoded: false,
+  };
+}
+
+function scanMp3(buffer: Uint8Array): {
+  sampleRate: number;
+  channels: number;
+  frames: number;
+  samplesPerChannel: number;
+} {
   let offset = skipId3v2(buffer);
   let sampleRate = 0;
   let channels = 0;
@@ -87,15 +147,23 @@ export function decodeMp3(buffer: Uint8Array): DecodedMp3 {
   if (frames === 0 || sampleRate === 0 || channels === 0) {
     throw new Error('[audio] MP3 payload has no MPEG frames.');
   }
+  return { sampleRate, channels, frames, samplesPerChannel };
+}
 
-  const samples = new Float32Array(samplesPerChannel * channels);
-  return {
-    sampleRate,
-    channels,
-    samples,
-    duration: samplesPerChannel / sampleRate,
-    frames,
-  };
+function defaultFfmpegSpawn(command: string, args: readonly string[], input: Uint8Array): Uint8Array | null {
+  try {
+    const result = spawnSync(command, [...args], {
+      input: Buffer.from(input),
+      encoding: 'buffer',
+      timeout: 8_000,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    if (result.error || result.status !== 0 || result.stdout === null) return null;
+    const stdout = result.stdout as Buffer;
+    return stdout.byteLength > 0 ? new Uint8Array(stdout) : null;
+  } catch {
+    return null;
+  }
 }
 
 function skipId3v2(bytes: Uint8Array): number {

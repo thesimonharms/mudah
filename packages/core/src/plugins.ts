@@ -23,6 +23,8 @@ import { isCommandExport, type CommandModule, type ProviderClass } from './appli
 export interface PluginInfo {
   /** Package name, as installed. */
   readonly name: string;
+  /** Installed package version, when the manifest could be read. */
+  readonly version?: string;
   /** Provider classes found in the package. */
   readonly providers: readonly ProviderClass[];
   /** Command modules found in the package. */
@@ -68,6 +70,7 @@ export interface PluginDiscoveryOptions {
 
 interface PackageJson {
   name?: string;
+  version?: string;
   keywords?: unknown;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -244,7 +247,15 @@ export async function loadPlugin(
   const deprecated =
     typeof mod.deprecated === 'string' || mod.deprecated === true ? (mod.deprecated as boolean | string) : undefined;
 
-  return { name, providers, commands, depends, peers, features, deprecated };
+  let version: string | undefined;
+  try {
+    const manifest = await readPluginManifest(basePath, name, options.readPackage ?? readJson, resolve);
+    if (manifest && typeof manifest.version === 'string') version = manifest.version;
+  } catch {
+    // Version is optional metadata.
+  }
+
+  return { name, version, providers, commands, depends, peers, features, deprecated };
 }
 
 /**

@@ -106,7 +106,7 @@ describe('TextArea', () => {
     area.value = ['a', 'b', 'c', 'd', 'e'].join('\n');
     // Caret sits on "e" (row 4); window of 2 must center on it: rows 3 and 4.
     area.row = 4;
-    expect(area.render()).toEqual(['d', 'e']);
+    expect(area.render()).toEqual(['d│', 'e█']);
   });
 
   it('updates its value and fires onChange', () => {

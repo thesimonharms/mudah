@@ -1,5 +1,5 @@
 import { Command } from '@mudah-cli/console';
-import { decodeLspFrames, encodeLspFrame, handleLspMessage, type LspMessage } from '../lsp.js';
+import { decodeLspFrames, encodeLspFrame, handleLspMessage, initializeResult, type LspMessage } from '../lsp.js';
 
 /**
  * Built-in `lsp` command: stdio JSON-RPC (Content-Length framed, with a
@@ -10,11 +10,16 @@ export default class LspCommand extends Command {
   description = 'Language server for mudah.json keys and command signatures';
 
   async handle(): Promise<number> {
+    if (this.option('probe') === true) {
+      const ready = initializeResult();
+      this.output.raw(`${JSON.stringify({ jsonrpc: '2.0', id: 1, result: ready })}\n`);
+      return 0;
+    }
     if (this.option('stdio') === true) {
       return this.serveStdio();
     }
     this.output.success('mudah-lsp ready');
-    this.output.muted('Pass --stdio to speak JSON-RPC on stdin/stdout.');
+    this.output.muted('Pass --stdio to speak JSON-RPC on stdin/stdout, or --probe to print initialize.');
     return 0;
   }
 

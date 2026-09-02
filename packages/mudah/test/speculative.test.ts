@@ -119,6 +119,13 @@ describe('lsp initialize', () => {
     const lf = decodeLspFrames(`Content-Length: ${Buffer.byteLength(body)}\n\n${body}`);
     expect(lf.messages[0]?.method).toBe('shutdown');
   });
+
+  it('probes initialize over --probe', async () => {
+    const result = await invoke(['lsp', '--probe']);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('mudah-lsp');
+    expect(result.out).toContain('completionProvider');
+  });
 });
 
 describe('built-in speculative commands', () => {
@@ -252,5 +259,28 @@ describe('production speculative helpers', () => {
     expect(seen).toEqual(['a.example', 'b.example']);
     expect(results[0]?.ok).toBe(true);
     expect(results[1]?.ok).toBe(false);
+  });
+
+  it('stops a rolling deploy on the first failed host', async () => {
+    const plan = buildDeployPlan(['a.example', 'b.example', 'c.example'], true, false);
+    const seen: string[] = [];
+    const { results } = await executeDeployPlan(plan, async (host) => {
+      seen.push(host);
+      return { ok: false, latencyMs: 1, detail: 'down' };
+    });
+    expect(seen).toEqual(['a.example']);
+    expect(results).toHaveLength(1);
+  });
+
+  it('throws when --execute has no probe', async () => {
+    const plan = buildDeployPlan(['a.example'], true, false);
+    await expect(executeDeployPlan(plan)).rejects.toThrow(/probe/);
+  });
+
+  it('strips NODE_OPTIONS inside the sandbox', async () => {
+    process.env['NODE_OPTIONS'] = '--require ./evil.js';
+    await withSandbox({ cwd: appDir }, () => {
+      expect(process.env['NODE_OPTIONS']).toBeUndefined();
+    });
   });
 });

@@ -1,5 +1,7 @@
 import { UsageError, type Application, type CommandModule } from '@mudah-cli/core';
 import type { Output } from '@mudah-cli/ui';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import {
   Command,
   ArgumentParseError,
@@ -82,12 +84,21 @@ function normalizeAliases(aliases: string[] | undefined, canonical: string): str
  * Errors propagate to the caller (the `@mudah-cli/mudah` umbrella renders them and
  * maps them to exit codes).
  */
+export interface ConsoleKernelOptions {
+  /** File used to persist command history across runs. */
+  historyFile?: string;
+  /** Max stored history lines. Default 1000. */
+  historyLimit?: number;
+}
+
 export class ConsoleKernel {
   private readonly commands = new Map<string, CommandEntry>();
   /** Alias name -> canonical command name. Kept separate from `commands` so the
    * command list never shows alias duplicates. */
   private readonly aliases = new Map<string, string>();
   private readonly _history: string[] = [];
+  private readonly historyFile?: string;
+  private readonly historyLimit: number;
 
   /** Dispatched argv (most recent last). */
   get history(): readonly string[] {
@@ -97,12 +108,18 @@ export class ConsoleKernel {
   /** Clear the command history. */
   clearHistory(): void {
     this._history.length = 0;
+    this.persistHistory();
   }
 
   constructor(
     private readonly app: Application,
     private readonly output: Output,
-  ) {}
+    options: ConsoleKernelOptions = {},
+  ) {
+    this.historyFile = options.historyFile;
+    this.historyLimit = options.historyLimit ?? 1000;
+    this.loadHistory();
+  }
 
   /** Register a command module (default export is the command class). */
   register(module: CommandModule): this {
@@ -275,6 +292,33 @@ export class ConsoleKernel {
 
     await this.app.events().emit('command.after', { command: canonical, exitCode, durationMs });
     this._history.push(argv.join(' '));
+    this.persistHistory();
     return exitCode;
+  }
+
+  private loadHistory(): void {
+    if (this.historyFile === undefined) return;
+    try {
+      const text = readFileSync(this.historyFile, 'utf8');
+      for (const line of text.split('\n')) {
+        if (line.length > 0) this._history.push(line);
+      }
+      if (this._history.length > this.historyLimit) {
+        this._history.splice(0, this._history.length - this.historyLimit);
+      }
+    } catch {
+      // Missing file is a first run.
+    }
+  }
+
+  private persistHistory(): void {
+    if (this.historyFile === undefined) return;
+    try {
+      mkdirSync(dirname(this.historyFile), { recursive: true });
+      const lines = this._history.slice(-this.historyLimit);
+      writeFileSync(this.historyFile, `${lines.join('\n')}${lines.length > 0 ? '\n' : ''}`, 'utf8');
+    } catch {
+      // A read-only filesystem just means history stays in memory.
+    }
   }
 }

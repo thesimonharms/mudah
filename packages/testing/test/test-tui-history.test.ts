@@ -109,6 +109,13 @@ describe('TestTui.measure / expectFast', () => {
     tui.send('down');
     expect(() => tui.expectFast(-1)).toThrow(/Expected last action to finish within -1ms/);
   });
+
+  it('toBeFast aliases expectFast and toHaveColor reads a color snapshot', () => {
+    const tui = picker();
+    tui.send('down');
+    expect(() => tui.toBeFast(10_000)).not.toThrow();
+    expect(() => tui.toHaveColor({ text: '▸', hex: '#7aa2f7' })).not.toThrow();
+  });
 });
 
 describe('TestTui.matchSnapshot visual diff', () => {

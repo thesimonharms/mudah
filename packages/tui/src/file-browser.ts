@@ -11,6 +11,7 @@ interface FileEntry {
   name: string;
   path: string;
   isDir: boolean;
+  depth: number;
 }
 
 export interface FileBrowserOptions {
@@ -24,26 +25,18 @@ export interface FileBrowserOptions {
 
 /**
  * Tree-based file browser. Navigate with arrow keys, expand directories,
- * and select a file with enter.
- *
- * ```ts
- * const browser = new FileBrowser({
- *   root: './src',
- *   filter: '.ts',
- *   onSelect: (path) => console.log(`Selected: ${path}`),
- * });
- * browser.load(fsAdapter);
- * // ... mount in layout, run event loop ...
- * ```
+ * type to fuzzy-filter, and select a file with enter.
  */
 export class FileBrowser extends BaseComponent {
   private entries: FileEntry[] = [];
   private readonly expanded = new Set<string>();
+  private query = '';
   selectedIndex = 0;
   private readonly root: string;
   private readonly filter?: string;
   private readonly onSelect?: (path: string) => void;
   private loaded = false;
+  private adapter: FileAdapter | undefined;
 
   constructor(options: FileBrowserOptions = {}) {
     super();
@@ -53,11 +46,18 @@ export class FileBrowser extends BaseComponent {
   }
 
   async load(adapter: FileAdapter): Promise<void> {
-    this.entries = await this.scan(adapter, this.root, '');
+    this.adapter = adapter;
+    this.entries = await this.scan(adapter, this.root, '', 0, false);
     this.loaded = true;
   }
 
-  private async scan(adapter: FileAdapter, dir: string, prefix: string): Promise<FileEntry[]> {
+  private async scan(
+    adapter: FileAdapter,
+    dir: string,
+    prefix: string,
+    depth: number,
+    intoExpanded: boolean,
+  ): Promise<FileEntry[]> {
     const names = await adapter.readdir(dir);
     const entries: FileEntry[] = [];
     for (const name of names) {
@@ -65,57 +65,91 @@ export class FileBrowser extends BaseComponent {
       const fullPath = prefix === '' ? name : `${prefix}/${name}`;
       const isDir = await adapter.isDir(`${dir}/${name}`);
       if (!isDir && this.filter && !name.endsWith(this.filter)) continue;
-      entries.push({ name, path: fullPath, isDir });
-      if (isDir) {
-        const children = await this.scan(adapter, `${dir}/${name}`, fullPath);
+      entries.push({ name, path: fullPath, isDir, depth });
+      if (isDir && (intoExpanded || this.expanded.has(fullPath))) {
+        const children = await this.scan(adapter, `${dir}/${name}`, fullPath, depth + 1, true);
         entries.push(...children);
       }
     }
     return entries;
   }
 
+  private visible(): FileEntry[] {
+    const q = this.query.toLowerCase();
+    if (q.length === 0) return this.entries;
+    return this.entries.filter((entry) => entry.path.toLowerCase().includes(q) || entry.name.toLowerCase().includes(q));
+  }
+
   render(): string[] {
     if (!this.loaded) return ['  (loading...)'];
-    if (this.entries.length === 0) return ['  (empty)'];
-    return this.entries.map((entry, i) => {
+    const rows = this.visible();
+    if (rows.length === 0) return [this.query.length > 0 ? `  (no matches for ${this.query})` : '  (empty)'];
+    const lines = rows.map((entry, i) => {
       const pointer = i === this.selectedIndex ? '▸ ' : '  ';
+      const indent = '  '.repeat(entry.depth);
       const mark = entry.isDir ? (this.expanded.has(entry.path) ? '▼ ' : '▶ ') : '  ';
-      return `${pointer}${mark}${entry.name}`;
+      return `${pointer}${indent}${mark}${entry.name}`;
     });
+    if (this.query.length > 0) lines.unshift(`/${this.query}`);
+    return lines;
   }
 
   inspect(): { role: string; name?: string; value?: unknown } {
-    return { role: 'fileBrowser', name: this.entries[this.selectedIndex]?.path, value: this.selectedIndex };
+    return { role: 'fileBrowser', name: this.visible()[this.selectedIndex]?.path, value: this.selectedIndex };
   }
 
   readonly focusable = true;
 
   override onKey(event: KeyEvent): boolean {
+    const rows = this.visible();
     switch (event.name) {
       case 'up':
         this.selectedIndex = Math.max(0, this.selectedIndex - 1);
         return true;
       case 'down':
-        this.selectedIndex = Math.min(this.entries.length - 1, this.selectedIndex + 1);
+        this.selectedIndex = Math.min(rows.length - 1, this.selectedIndex + 1);
         return true;
       case 'space':
       case 'right': {
-        const entry = this.entries[this.selectedIndex];
+        const entry = rows[this.selectedIndex];
         if (entry?.isDir) {
           if (this.expanded.has(entry.path)) this.expanded.delete(entry.path);
           else this.expanded.add(entry.path);
+          if (this.adapter) void this.reload();
         }
         return true;
       }
-      case 'enter': {
-        const entry = this.entries[this.selectedIndex];
-        if (entry && !entry.isDir) {
-          this.onSelect?.(entry.path);
+      case 'left': {
+        const entry = rows[this.selectedIndex];
+        if (entry?.isDir && this.expanded.has(entry.path)) {
+          this.expanded.delete(entry.path);
+          if (this.adapter) void this.reload();
         }
+        return true;
+      }
+      case 'backspace':
+        this.query = this.query.slice(0, -1);
+        this.selectedIndex = 0;
+        return true;
+      case 'enter': {
+        const entry = rows[this.selectedIndex];
+        if (entry && !entry.isDir) this.onSelect?.(entry.path);
         return true;
       }
       default:
+        if (event.ch !== undefined && event.ch >= ' ') {
+          this.query += event.ch;
+          this.selectedIndex = 0;
+          return true;
+        }
         return false;
     }
+  }
+
+  private async reload(): Promise<void> {
+    if (!this.adapter) return;
+    this.entries = await this.scan(this.adapter, this.root, '', 0, false);
+    const max = Math.max(0, this.visible().length - 1);
+    this.selectedIndex = Math.min(this.selectedIndex, max);
   }
 }

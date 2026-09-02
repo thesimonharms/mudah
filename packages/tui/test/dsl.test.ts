@@ -17,6 +17,7 @@ import {
   fromLayout,
   parseLayout,
   parseSessionTape,
+  renderWidgetToHtml,
   renderWidgetToText,
   renderWidgetTree,
   replayTape,
@@ -191,5 +192,11 @@ describe('speculative TUI surfaces', () => {
     const src = readFileSync(new URL('../src/wasi.ts', import.meta.url), 'utf8');
     expect(src).not.toMatch(/from ['"]node:(fs|process)['"]/);
     expect(src).not.toMatch(/\bprocess\./);
+  });
+
+  it('renders widgets to HTML for the web port', () => {
+    const html = renderWidgetToHtml(new Label('Hello'));
+    expect(html).toContain('<pre class="mudah-widget">');
+    expect(html).toContain('Hello');
   });
 });

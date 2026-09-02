@@ -11,7 +11,8 @@ import {
   FuzzyList,
   Label,
   List,
-  Overlay,
+  DatePicker,
+  Popover,
   ProgressBar,
   Radio,
   Screen,
@@ -24,6 +25,7 @@ import {
   MetricGauge,
   NotificationsScreen,
   MenuScreen,
+  Overlay,
   PivotScreen,
   type NotificationEntry,
 } from '@mudah-cli/tui';
@@ -163,6 +165,19 @@ describe('Screen.table', () => {
     screen.table.confirm();
     expect(screen.result()).toBe(0);
   });
+
+  it('inserts and deletes rows', () => {
+    const screen = Screen.table({
+      title: 'Hosts',
+      columns: [{ header: 'Host' }],
+      rows: [['db'], ['web']],
+    });
+    TestTui.mount(screen.root, { cols: 60, rows: 12 });
+    screen.table.onKey({ name: 'n' });
+    expect(screen.rows()).toHaveLength(3);
+    screen.table.onKey({ name: 'd' });
+    expect(screen.rows()).toHaveLength(2);
+  });
 });
 
 describe('Overlay', () => {
@@ -176,7 +191,7 @@ describe('Overlay', () => {
   it('opens a registered palette on ctrl+k', () => {
     const overlay = new Overlay(new Column().add(new Label('base')));
     let picked = '';
-    overlay.setPalette([{ id: 'go', label: 'Go now' }], (id) => {
+    overlay.setPalette([{ id: 'go', label: 'Go now' }], (id: string) => {
       picked = id;
     });
     overlay.resize(40, 8);
@@ -368,7 +383,7 @@ describe('ProgressBar', () => {
 describe('Breadcrumb', () => {
   it('renders a path of crumbs', () => {
     const b = new Breadcrumb([{ label: 'home' }, { label: 'settings' }]);
-    expect(b.render()).toEqual(['home / settings']);
+    expect(b.render()).toEqual(['[home] / settings']);
   });
 
   it('moves the selection with arrows', () => {
@@ -488,7 +503,9 @@ describe('Screen.notifications', () => {
     const snap = tui.snapshot();
     expect(snap).toContain('Log');
     expect(snap).toContain('✓ Deployed');
+    expect(snap).toContain('10:30');
     expect(snap).toContain('✗ Build failed');
+    expect(snap).toContain('exit 1');
     expect(snap).toContain('ℹ Syncing');
   });
 
@@ -536,5 +553,39 @@ describe('Screen.pivot', () => {
       expect.arrayContaining(['prod', '2']),
       expect.arrayContaining(['staging', '1']),
     ]));
+  });
+
+  it('cycles groupBy with left/right', () => {
+    const screen = Screen.pivot({
+      title: 'Env count',
+      columns: [{ header: 'env' }, { header: 'host' }],
+      rows: [
+        ['prod', 'web'],
+        ['prod', 'db'],
+        ['staging', 'web'],
+      ],
+    });
+    const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
+    expect(screen.groupBy).toBe(0);
+    tui.send('right');
+    expect(screen.groupBy).toBe(1);
+    expect(tui.snapshot()).toContain('host');
+  });
+});
+
+describe('DatePicker and Popover', () => {
+  it('jumps to a typed day', () => {
+    const picker = new DatePicker({ date: new Date(Date.UTC(2026, 8, 1)) });
+    picker.onKey({ name: '1', ch: '1' });
+    picker.onKey({ name: '5', ch: '5' });
+    expect(picker.cursor.getUTCDate()).toBe(15);
+  });
+
+  it('anchors a popover away from the origin', () => {
+    const pop = new Popover(['hint'], { x: 2, y: 1 });
+    const lines = pop.render();
+    expect(lines[0]).toBe('');
+    expect(lines[1]).toContain('╭');
+    expect(lines[2]).toContain('hint');
   });
 });

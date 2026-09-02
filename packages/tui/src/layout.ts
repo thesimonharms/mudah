@@ -193,6 +193,14 @@ export abstract class Layout extends BaseComponent {
     }
   }
 
+  /** Advance animated children (Spinner, VideoPlayer). */
+  tick(dtMs: number): void {
+    for (const child of this.children) {
+      if (child instanceof Layout) child.tick(dtMs);
+      else child.tick?.(dtMs);
+    }
+  }
+
   resize(width: number, height: number): void {
     this.box = { width, height };
   }

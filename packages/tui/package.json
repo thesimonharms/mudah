@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./wasi": {
+      "types": "./dist/wasi.d.ts",
+      "default": "./dist/wasi.js"
     }
   },
   "files": [

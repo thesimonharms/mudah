@@ -31,6 +31,10 @@ export class Table extends BaseComponent {
     if (this.selectedIndex >= rows.length) this.selectedIndex = Math.max(0, rows.length - 1);
   }
 
+  setColumns(columns: TableColumnDef[]): void {
+    this.columns = columns;
+  }
+
   get rowCount(): number {
     return this.rows.length;
   }
@@ -87,6 +91,31 @@ export class Table extends BaseComponent {
     return { role: 'table', name: this.selected?.[0], value: this.selectedIndex };
   }
 
+  insertRow(row?: string[]): number {
+    const next = row ?? this.columns.map(() => '');
+    this.rows.splice(this.selectedIndex + 1, 0, next);
+    this.selectedIndex += 1;
+    return this.selectedIndex;
+  }
+
+  deleteRow(): string[] | undefined {
+    if (this.rows.length === 0) return undefined;
+    const removed = this.rows.splice(this.selectedIndex, 1)[0];
+    if (this.selectedIndex >= this.rows.length) this.selectedIndex = Math.max(0, this.rows.length - 1);
+    return removed;
+  }
+
+  updateCell(column: number, value: string): void {
+    const row = this.rows[this.selectedIndex];
+    if (!row) return;
+    while (row.length <= column) row.push('');
+    row[column] = value;
+  }
+
+  getRows(): string[][] {
+    return this.rows.map((row) => [...row]);
+  }
+
   render(): string[] {
     const start = this.scrollTop;
     const visible = this.rows.slice(start, start + this.budget);
@@ -103,6 +132,7 @@ export class Table extends BaseComponent {
   }
 
   readonly focusable = true;
+  readonly keys = { up: 'up', down: 'down', enter: 'select', n: 'insert', d: 'delete' };
 
   override onKey(event: KeyEvent): boolean {
     switch (event.name) {
@@ -115,7 +145,21 @@ export class Table extends BaseComponent {
       case 'enter':
         this.confirm();
         return true;
+      case 'n':
+        this.insertRow();
+        return true;
+      case 'd':
+      case 'delete':
+        this.deleteRow();
+        return true;
       default:
+        if (event.ch !== undefined && event.ch >= ' ' && event.name.length === 1) {
+          const row = this.rows[this.selectedIndex];
+          if (row) {
+            row[0] = `${row[0] ?? ''}${event.ch}`;
+            return true;
+          }
+        }
         return false;
     }
   }
@@ -691,7 +735,13 @@ export class TextArea extends BaseComponent {
     const top = this.scrollTop;
     const visible = this.lines.slice(top, top + this.visibleRows);
     while (visible.length < this.visibleRows) visible.push('');
-    return visible;
+    const total = Math.max(this.lines.length, 1);
+    const thumb =
+      total <= this.visibleRows ? 0 : Math.round((top / Math.max(1, total - this.visibleRows)) * (this.visibleRows - 1));
+    return visible.map((line, i) => {
+      const bar = total <= this.visibleRows ? '│' : i === thumb ? '█' : '│';
+      return `${line}${bar}`;
+    });
   }
 
   measure(_width: number, _height: number): { width: number; height: number } {
@@ -861,9 +911,17 @@ export class Spinner extends BaseComponent {
  */
 export class Tooltip extends BaseComponent {
   readonly focusable = false;
+  private readonly anchorX: number;
+  private readonly anchorY: number;
 
-  constructor(private title: string, private text: string) {
+  constructor(
+    private title: string,
+    private text: string,
+    options: { x?: number; y?: number } = {},
+  ) {
     super();
+    this.anchorX = options.x ?? 0;
+    this.anchorY = options.y ?? 0;
   }
 
   setText(text: string): void {
@@ -871,8 +929,12 @@ export class Tooltip extends BaseComponent {
   }
 
   render(): string[] {
-    if (this.text.length === 0) return [this.title];
-    return [this.title ? `${this.title} — ${this.text}` : this.text];
+    const body = this.text.length === 0 ? this.title : this.title ? `${this.title} — ${this.text}` : this.text;
+    const pad = ' '.repeat(this.anchorX);
+    const lines: string[] = [];
+    for (let i = 0; i < this.anchorY; i++) lines.push('');
+    lines.push(`${pad}${body}`);
+    return lines;
   }
 
   measure(_width: number, _height: number): { width: number; height: number } {
@@ -1091,7 +1153,39 @@ export class Calendar extends BaseComponent {
         this.confirm();
         return true;
       default:
+        if (event.ch !== undefined && event.ch >= '0' && event.ch <= '9') {
+          this.typeDigit(event.ch);
+          return true;
+        }
         return false;
+    }
+  }
+
+  private typed = '';
+
+  private typeDigit(ch: string): void {
+    this.typed += ch;
+    if (this.typed.length > 8) this.typed = this.typed.slice(-8);
+    const year = this.cursor.getUTCFullYear();
+    const month = this.cursor.getUTCMonth();
+    if (this.typed.length <= 2) {
+      const day = Number(this.typed);
+      const max = this.daysInMonth(year, month);
+      if (day >= 1 && day <= max) {
+        const d = new Date(this.cursor);
+        d.setUTCDate(day);
+        this.cursor = d;
+      }
+      return;
+    }
+    if (this.typed.length === 8) {
+      const y = Number(this.typed.slice(0, 4));
+      const m = Number(this.typed.slice(4, 6));
+      const day = Number(this.typed.slice(6, 8));
+      if (y >= 1970 && m >= 1 && m <= 12 && day >= 1 && day <= this.daysInMonth(y, m - 1)) {
+        this.cursor = new Date(Date.UTC(y, m - 1, day));
+        this.typed = '';
+      }
     }
   }
 
@@ -1283,11 +1377,14 @@ export interface BreadcrumbItem {
 
 export interface BreadcrumbOptions {
   onSelect?: (item: BreadcrumbItem, index: number) => void;
+  /** Trailing-ellipsis width cap. Default 40. */
+  maxWidth?: number;
 }
 
-/** A focusable breadcrumb path. Arrows move between crumbs, enter selects. */
+/** A focusable breadcrumb path. Arrows / clicks select crumbs; overflow uses trailing ellipsis. */
 export class Breadcrumb extends BaseComponent {
   selectedIndex = 0;
+  private width: number;
 
   readonly focusable = true;
   readonly keys = { left: 'prev', right: 'next', home: 'first', end: 'last', enter: 'select' };
@@ -1297,6 +1394,7 @@ export class Breadcrumb extends BaseComponent {
     private readonly options: BreadcrumbOptions = {},
   ) {
     super();
+    this.width = options.maxWidth ?? 40;
   }
 
   private clamp(i: number): number {
@@ -1312,8 +1410,24 @@ export class Breadcrumb extends BaseComponent {
     if (item) this.options.onSelect?.(item, this.selectedIndex);
   }
 
+  private parts(): string[] {
+    return this.crumbs.map((c, i) => (i === this.selectedIndex ? `[${c.label}]` : c.label));
+  }
+
   render(): string[] {
-    return [this.crumbs.map((c) => c.label).join(' / ')];
+    const parts = this.parts();
+    let line = parts.join(' / ');
+    if (visibleLength(line) <= this.width) return [line];
+    const keep = [parts[this.selectedIndex] ?? ''];
+    for (let i = this.crumbs.length - 1; i >= 0; i--) {
+      if (i === this.selectedIndex) continue;
+      const next = [parts[i] ?? '', ...keep];
+      const candidate = `… / ${next.join(' / ')}`;
+      if (visibleLength(candidate) > this.width) break;
+      keep.unshift(parts[i] ?? '');
+    }
+    line = keep.length === parts.length ? parts.join(' / ') : `… / ${keep.join(' / ')}`;
+    return [line];
   }
 
   measure(_width: number, _height: number): { width: number; height: number } {
@@ -1343,12 +1457,83 @@ export class Breadcrumb extends BaseComponent {
     }
   }
 
+  override onMouse(event: MouseEvent): boolean {
+    if (!event.buttons.left) return false;
+    const parts = this.parts();
+    let x = 0;
+    for (let i = 0; i < parts.length; i++) {
+      const token = parts[i] ?? '';
+      const end = x + visibleLength(token);
+      if (event.x >= x && event.x < end) {
+        this.selectedIndex = i;
+        this.confirm();
+        return true;
+      }
+      x = end + 3;
+    }
+    return false;
+  }
+
   inspect(): { role: string; name?: string; value?: unknown } {
     return {
       role: 'breadcrumb',
       name: this.crumbs[this.selectedIndex]?.label,
       value: this.crumbs[this.selectedIndex],
     };
+  }
+}
+
+/**
+ * Calendar plus digit typing (`15` jumps to the 15th; `20260901` is YYYYMMDD).
+ */
+export class DatePicker extends Calendar {
+  inspect(): { role: string; name?: string; value?: unknown } {
+    const base = super.inspect();
+    return { ...base, role: 'datePicker' };
+  }
+}
+
+export interface PopoverOptions {
+  /** Column offset from the left of the parent. */
+  x?: number;
+  /** Row offset from the top of the parent. */
+  y?: number;
+  width?: number;
+}
+
+/**
+ * Anchored floating box. Pads with spaces so the body sits at `(x, y)`.
+ */
+export class Popover extends BaseComponent {
+  readonly focusable = false;
+
+  constructor(
+    private readonly body: string[],
+    private readonly options: PopoverOptions = {},
+  ) {
+    super();
+  }
+
+  render(): string[] {
+    const x = Math.max(0, this.options.x ?? 0);
+    const y = Math.max(0, this.options.y ?? 0);
+    const width = this.options.width ?? Math.max(0, ...this.body.map((line) => visibleLength(line)));
+    const pad = ' '.repeat(x);
+    const lines: string[] = [];
+    for (let i = 0; i < y; i++) lines.push('');
+    const top = `${pad}╭${'─'.repeat(Math.max(width, 1))}╮`;
+    const bottom = `${pad}╰${'─'.repeat(Math.max(width, 1))}╯`;
+    lines.push(top);
+    for (const row of this.body) {
+      const inner = row + ' '.repeat(Math.max(0, width - visibleLength(row)));
+      lines.push(`${pad}│${inner}│`);
+    }
+    lines.push(bottom);
+    return lines;
+  }
+
+  inspect(): { role: string; value?: unknown } {
+    return { role: 'popover', value: { x: this.options.x ?? 0, y: this.options.y ?? 0 } };
   }
 }
 

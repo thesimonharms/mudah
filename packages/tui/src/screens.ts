@@ -260,7 +260,7 @@ export class TableScreen extends ScreenHandle<string[] | number> {
   constructor(options: TableOptions) {
     super();
     const onSelect = (index: number): void => {
-      this.value = options.select ? index : options.rows[index] ?? [];
+      this.value = options.select ? index : this.table.getRows()[index] ?? [];
       this.done?.();
     };
     this.table = new Table(options.columns, options.rows, onSelect);
@@ -269,6 +269,11 @@ export class TableScreen extends ScreenHandle<string[] | number> {
       new Viewport(this.table, 12),
       new HelpFooter({ ...keys.table, escape: 'quit' }),
     );
+  }
+
+  /** Current row set after insert/delete/edit. */
+  rows(): string[][] {
+    return this.table.getRows();
   }
 }
 
@@ -359,15 +364,34 @@ export class PivotScreen extends ScreenHandle<string[][]> {
     this.columns = options.columns;
     this.rows = options.rows;
     this.groupIndex = options.groupBy ?? 0;
-    this.table = new Table(this.buildColumns(), this.buildRows(), (index) => {
+    this.table = new Table(this.buildColumns(), this.buildRows(), (_index) => {
       this.value = this.buildRows();
       this.done?.();
     });
+    const origKey = this.table.onKey.bind(this.table);
+    this.table.onKey = (event: KeyEvent): boolean => {
+      if (event.name === 'left' || event.name === 'right') {
+        this.cycle(event.name === 'right' ? 1 : -1);
+        return true;
+      }
+      return origKey(event);
+    };
     this.root = new Column().add(
       new Label(options.title ?? 'Pivot'),
       this.table,
       new HelpFooter({ ...keys.table, escape: 'quit' }),
     );
+  }
+
+  private cycle(delta: number): void {
+    if (this.columns.length === 0) return;
+    this.groupIndex = (this.groupIndex + delta + this.columns.length) % this.columns.length;
+    this.table.setColumns(this.buildColumns());
+    this.table.setRows(this.buildRows());
+  }
+
+  get groupBy(): number {
+    return this.groupIndex;
   }
 
   private buildColumns(): TableColumnDef[] {
@@ -408,7 +432,9 @@ export class NotificationsScreen extends ScreenHandle<void> {
     super();
     const items = options.entries.map((e) => {
       const icon = e.type === 'success' ? '✓' : e.type === 'error' ? '✗' : e.type === 'warn' ? '⚠' : 'ℹ';
-      return `${icon} ${e.label}`;
+      const message = e.message ? ` — ${e.message}` : '';
+      const time = e.time ? `  ${e.time}` : '';
+      return `${icon} ${e.label}${message}${time}`;
     });
     this.list = new List(items.length > 0 ? items : ['(no notifications)']);
     this.root = new Column().add(

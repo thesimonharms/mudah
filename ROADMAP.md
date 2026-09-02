@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: **0.7.0** (published). The 0.8.0 working tree now contains the full feature backlog (unreleased). The [TUI skill](.cursor/skills/mudah-tui/SKILL.md) and [llms.txt](llms.txt) are the agent surface. Checked items below are in tree and covered by package tests.
+Current release: **0.8.0** (published). This working tree is the 0.9.0 candidate: the full feature backlog is in tree and covered by package tests. The [TUI skill](.cursor/skills/mudah-tui/SKILL.md) and [llms.txt](llms.txt) are the agent surface. Checked items below are implemented.
 
 ## Shipped
 

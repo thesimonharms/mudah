@@ -32,7 +32,16 @@ describe('decodeMp3', () => {
     expect(decoded.frames).toBe(2);
     expect(decoded.samples.length).toBe(2 * 1152 * 2);
     expect(decoded.duration).toBeCloseTo((2 * 1152) / 44100);
+    expect(decoded.decoded).toBe(false);
     expect(decoded.samples.every((s) => s === 0)).toBe(true);
+  });
+
+  it('uses injected ffmpeg PCM', () => {
+    const pcm = new Float32Array([0.25, -0.5, 0.0, 0.5]);
+    const bytes = new Uint8Array(pcm.buffer);
+    const decoded = decodeMp3(mpegFrame(), { spawn: () => bytes });
+    expect(decoded.decoded).toBe(true);
+    expect([...decoded.samples]).toEqual([...pcm]);
   });
 
   it('skips an ID3v2 tag', () => {

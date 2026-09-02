@@ -60,6 +60,15 @@ describe('fileSecretDriver', () => {
     expect(driver.delete('token')).toBe(true);
     expect(driver.get('token')).toBeUndefined();
   });
+
+  it('writes secrets.json with mode 0600', async () => {
+    const dir = await tempDir();
+    const driver = fileSecretDriver(dir);
+    driver.set('token', 'abc');
+    const { statSync } = await import('node:fs');
+    const mode = statSync(join(dir, 'secrets.json')).mode & 0o777;
+    expect(mode).toBe(0o600);
+  });
 });
 
 describe('keyringSecretDriver', () => {

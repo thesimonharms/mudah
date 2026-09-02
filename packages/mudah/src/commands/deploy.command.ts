@@ -1,13 +1,20 @@
 import { Command } from '@mudah-cli/console';
-import { buildDeployPlan, executeDeployPlan, parseHosts, type HostProbe } from '../deploy.js';
+import {
+  buildDeployPlan,
+  defaultSshProbe,
+  executeDeployPlan,
+  parseHosts,
+  type HostProbe,
+} from '../deploy.js';
 
 /**
- * Built-in `deploy` command: multi-host rolling or parallel plan.
- * `--execute` runs injectable health probes (default dry-run, no SSH).
+ * Built-in `deploy` command: multi-host rolling or parallel SSH probes.
+ * Default is a plan-only dry-run. `--execute` runs probes (bound
+ * `deploy.probe`, or SSH BatchMode).
  */
 export default class DeployCommand extends Command {
   signature = 'deploy {host=localhost} [--rolling] [--execute]';
-  description = 'Plan (and optionally probe) a multi-host deploy';
+  description = 'Plan (and optionally probe over SSH) a multi-host deploy';
   static exitCodes = { 1: 'A host probe failed during --execute' };
 
   async handle(): Promise<number> {
@@ -25,18 +32,22 @@ export default class DeployCommand extends Command {
       this.output.raw(`  ${entry.host}  (${wave})\n`);
     }
 
-    const probe = this.app.has('deploy.probe') ? this.app.make<HostProbe>('deploy.probe') : undefined;
-    const { results } = await executeDeployPlan(plan, probe);
-    if (execute) {
-      for (const result of results) {
-        const line = `${result.host}  ${result.ok ? 'ok' : 'fail'}  ${result.latencyMs}ms`;
-        this.output.raw(`  ${line}${result.detail ? `  ${result.detail}` : ''}\n`);
-      }
-      if (results.some((result) => !result.ok)) return 1;
-    } else {
-      this.output.muted('No SSH — this is a plan only.');
+    if (!execute) {
+      this.output.muted('No SSH — this is a plan only. Pass --execute to probe hosts.');
+      this.output.success('deploy plan ready');
+      return 0;
     }
-    this.output.success('deploy plan ready');
+
+    const probe: HostProbe = this.app.has('deploy.probe')
+      ? this.app.make<HostProbe>('deploy.probe')
+      : defaultSshProbe;
+    const { results } = await executeDeployPlan(plan, probe);
+    for (const result of results) {
+      const line = `${result.host}  ${result.ok ? 'ok' : 'fail'}  ${result.latencyMs}ms`;
+      this.output.raw(`  ${line}${result.detail ? `  ${result.detail}` : ''}\n`);
+    }
+    if (results.some((result) => !result.ok)) return 1;
+    this.output.success('deploy complete');
     return 0;
   }
 }

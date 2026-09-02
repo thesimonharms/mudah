@@ -10,7 +10,7 @@ export {
   type LspMessage,
 } from './lsp.js';
 export { enterSandbox, withSandbox, type SandboxSession } from './sandbox.js';
-export { buildDeployPlan, executeDeployPlan, parseHosts, type DeployPlan, type HostProbe } from './deploy.js';
+export { buildDeployPlan, executeDeployPlan, parseHosts, defaultSshProbe, validateHost, type DeployPlan, type HostProbe } from './deploy.js';
 export { normalizeAutocompleteShell, renderAutocompleteScript, type AutocompleteShell } from './autocomplete.js';
 
 // App-facing re-exports: `import { Command } from '@mudah-cli/mudah'` is all users need.
@@ -66,6 +66,7 @@ export {
   installConfigReloadSignal,
   keyringSecretDriver,
   loadRemoteConfig,
+  assertRemoteUrl,
   redactSecrets,
   REDACT_KEYS,
   resolveSecret,

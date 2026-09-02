@@ -7,6 +7,7 @@ export {
   type CommandEntry,
   type CommandGroup,
   type CommandModule,
+  type ConsoleKernelOptions,
 } from './kernel.js';
 export { Prompts, type PromptOptions } from './prompts.js';
 export {

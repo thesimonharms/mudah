@@ -32,6 +32,7 @@ function runVitest(
     const args = ['vitest', flags.watch ? 'watch' : 'run'];
     if (pattern !== undefined) args.push(pattern);
     if (flags.coverage) args.push('--coverage');
+    if (process.env['UPDATE_SNAPSHOT'] === '1') args.push('--update');
     const child = spawn('npx', ['--no-install', ...args], {
       cwd,
       stdio: 'inherit',
@@ -46,7 +47,7 @@ function runVitest(
  * Built-in `test` command: spawn vitest, or list matching `*.test.ts` files.
  */
 export default class TestCommand extends Command {
-  signature = 'test {pattern?} [--watch] [--coverage] [--fail-empty]';
+  signature = 'test {pattern?} [--watch] [--coverage] [--fail-empty] [--update]';
   description = 'Discover *.test.ts files and run vitest';
   static exitCodes = { 1: 'No tests found (--fail-empty) or vitest failed' };
 
@@ -57,6 +58,10 @@ export default class TestCommand extends Command {
     await walkTests(base, pattern, files);
     this.output.section('Tests');
     this.output.keyValue('files', String(files.length));
+
+    if (this.option('update') === true) {
+      process.env['UPDATE_SNAPSHOT'] = '1';
+    }
 
     if (files.length === 0) {
       this.output.warn('No *.test.ts files found.');

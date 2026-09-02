@@ -21,6 +21,8 @@ export interface LoadRemoteConfigOptions {
   cachePath?: string;
   /** Alternate URL (`{ remote: url }` form). Wins over the first argument. */
   remote?: string;
+  /** Allow loopback and RFC1918 hosts. Default false. */
+  allowPrivate?: boolean;
 }
 
 interface RemoteCacheEntry {
@@ -38,6 +40,63 @@ export function resolveRemoteUrl(
 ): string {
   const raw = options.remote ?? (typeof url === 'string' ? url : url.remote);
   return raw.replace(/^remote:/i, '').trim();
+}
+
+const BLOCKED_HOSTS = new Set([
+  'metadata.google.internal',
+  'metadata.goog',
+  '169.254.169.254',
+]);
+
+function isIpv4(host: string): number[] | undefined {
+  const parts = host.split('.');
+  if (parts.length !== 4) return undefined;
+  const nums = parts.map((p) => Number(p));
+  if (nums.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return undefined;
+  return nums;
+}
+
+function isPrivateOrLocal(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h === '::1' || h === '0.0.0.0' || h === '::') return true;
+  if (h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) return true;
+  const ip = isIpv4(h);
+  if (!ip) return false;
+  const [a, b] = ip;
+  if (a === 127 || a === 0 || a === 10) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b !== undefined && b >= 16 && b <= 31) return true;
+  if (a === 169 && b === 254) return true;
+  return false;
+}
+
+/**
+ * Reject non-http(s) URLs, link-local / metadata hosts, and (unless
+ * `allowPrivate`) loopback plus RFC1918 addresses.
+ */
+export function assertRemoteUrl(url: string, options: { allowPrivate?: boolean } = {}): string {
+  const trimmed = url.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error(`[config] Invalid remote URL "${url}".`);
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error(`[config] Remote config must be http(s), got "${parsed.protocol}".`);
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (BLOCKED_HOSTS.has(host) || host.endsWith('.internal')) {
+    throw new Error(`[config] Remote config host "${host}" is blocked.`);
+  }
+  const ip = isIpv4(host);
+  if (ip && ip[0] === 169 && ip[1] === 254) {
+    throw new Error(`[config] Remote config host "${host}" is blocked.`);
+  }
+  if (!options.allowPrivate && isPrivateOrLocal(host)) {
+    throw new Error(`[config] Remote config host "${host}" is private. Pass allowPrivate to permit it.`);
+  }
+  return parsed.href;
 }
 
 function defaultCacheDir(): string {
@@ -104,6 +163,7 @@ export async function loadRemoteConfig(
   const opts: LoadRemoteConfigOptions =
     typeof url === 'object' ? { ...options, ...url } : options;
   const resolved = resolveRemoteUrl(typeof url === 'string' ? url : url.remote, opts);
+  if (resolved.length > 0) assertRemoteUrl(resolved, { allowPrivate: opts.allowPrivate });
   const ttlMs = opts.ttlMs ?? REMOTE_CONFIG_TTL_MS;
   const now = opts.now ?? Date.now;
   const file = cacheFile(opts);

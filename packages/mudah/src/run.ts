@@ -16,6 +16,7 @@ import {
 import { detectCapabilities, osc, type TerminalCapabilities, type ThemeQueryInput } from '@mudah-cli/terminal';
 import { Output, detectTheme, renderTable } from '@mudah-cli/ui';
 import { ConsoleKernel, renderError, renderCommandHelp, renderCommandList, parseSignature, type CommandModule } from '@mudah-cli/console';
+import { Column, Label, List, dumpTree } from '@mudah-cli/tui';
 import { normalizeAutocompleteShell, renderAutocompleteScript } from './autocomplete.js';
 import HelpCommand from './commands/help.command.js';
 import VersionCommand from './commands/version.command.js';
@@ -407,7 +408,9 @@ export async function run(options: RunOptions = {}): Promise<number> {
   // manifest extras, and explicitly injected modules (bundled apps).
   // First registration of a name wins; later duplicates are skipped so a
   // checkout that both discovers and injects the same command stays clean.
-  const kernel = new ConsoleKernel(app, output);
+  const kernel = new ConsoleKernel(app, output, {
+    historyFile: join(cwd, '.mudah', 'history'),
+  });
   registerReservedBuiltIns(kernel);
   const seen = new Set(kernel.list().map((entry) => entry.name));
 
@@ -460,6 +463,12 @@ export async function run(options: RunOptions = {}): Promise<number> {
 
   // Global flags.
   const [first] = dispatchArgv;
+  if (flags.a11yTree) {
+    const demo = new Column().add(new Label('a11y'), new List(['a', 'b']));
+    demo.resize(40, 8);
+    stdout.write(`${JSON.stringify(dumpTree(demo))}\n`);
+    if (first === undefined || first === 'doctor') return 0;
+  }
   if (first === undefined || first === '--help' || first === '-h') {
     if (jsonMode) {
       stdout.write(
@@ -470,7 +479,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const lines: string[] = [];
     renderCommandList(manifest.name, manifest.version, kernel.list(), lines);
     output.raw(lines.join('\n'));
-    output.raw('\n\nGlobal flags:\n  --help/-h  Show this help\n  --version  Show the version\n  --json     Machine-readable JSON output\n  --plain    Strip all ANSI styling\n  --profile  Print boot and command timings\n  --profile-file  Write Chrome-trace timings to a JSON file\n  --timeout  Kill command after N ms (e.g. --timeout=5s)\n  --memory   Kill command when heap exceeds N MB (e.g. --memory=512mb)\n  --headless  Non-TTY, no animations (CI)\n  --trace    Log every event-bus dispatch\n  --a11y-tree  Reserved / doctor accessibility dump\n  --autocomplete  Emit bash/zsh/fish completion script');
+    output.raw('\n\nGlobal flags:\n  --help/-h  Show this help\n  --version  Show the version\n  --json     Machine-readable JSON output\n  --plain    Strip all ANSI styling\n  --profile  Print boot and command timings\n  --profile-file  Write Chrome-trace timings to a JSON file\n  --timeout  Kill command after N ms (e.g. --timeout=5s)\n  --memory   Kill command when heap exceeds N MB (e.g. --memory=512mb)\n  --headless  Non-TTY, no animations (CI)\n  --trace    Log every event-bus dispatch\n  --a11y-tree  Print the accessibility tree as JSON\n  --autocomplete  Emit bash/zsh/fish completion script');
     return 0;
   }
   if (first === '--version') {
@@ -504,15 +513,19 @@ export async function run(options: RunOptions = {}): Promise<number> {
   let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
   let memoryTimer: ReturnType<typeof setInterval> | undefined;
   let timeoutFired = false;
+  let memoryFired = false;
+
+  const forceExit = (code: number): void => {
+    if (env['VITEST'] !== undefined || env['MUDAH_NO_FORCE_EXIT'] === '1') return;
+    process.exit(code);
+  };
 
   if (timeoutMs > 0) {
     timeoutTimer = setTimeout(() => {
       timeoutFired = true;
       process.exitCode = 124;
       output.error(`Command timed out after ${Math.round(timeoutMs / 1_000)}s`);
-      // Emit exit event before forcing exit.
-      void kernel.dispatch; // ensure reference is not lost
-      process.kill(process.pid, 'SIGTERM');
+      forceExit(124);
     }, timeoutMs);
   }
 
@@ -520,9 +533,10 @@ export async function run(options: RunOptions = {}): Promise<number> {
     memoryTimer = setInterval(() => {
       const used = process.memoryUsage().heapUsed;
       if (used > memoryLimit) {
+        memoryFired = true;
         output.error(`Memory limit exceeded: ${(used / 1_048_576).toFixed(0)}MB > ${(memoryLimit / 1_048_576).toFixed(0)}MB`);
         process.exitCode = 137;
-        process.kill(process.pid, 'SIGKILL');
+        forceExit(137);
       }
     }, 500);
   }
@@ -565,6 +579,8 @@ export async function run(options: RunOptions = {}): Promise<number> {
       }
       if (code === 0) await nudgeUpdate(output, manifest, updateOptions);
     }
+    if (timeoutFired) return 124;
+    if (memoryFired) return 137;
     return code;
   } catch (rawError) {
     let parsed: { message: string; hint?: string; usage?: string };

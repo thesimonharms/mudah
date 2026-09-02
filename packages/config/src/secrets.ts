@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isPlainObject } from './paths.js';
@@ -72,7 +72,9 @@ function readJsonObject(file: string): Record<string, string> {
 
 function writeJsonObject(file: string, data: Record<string, string>): void {
   mkdirSync(join(file, '..'), { recursive: true });
-  writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf8');
+  writeFileSync(file, JSON.stringify(data, null, 2) + '\n', { encoding: 'utf8', mode: 0o600 });
+  // mode on writeFileSync is ignored when the file already exists.
+  chmodSync(file, 0o600);
 }
 
 function defaultSecretsDir(): string {
@@ -243,17 +245,9 @@ export function keyringSecretDriver(options: KeyringDriverOptions = {}): SecretD
         if (result === null || result.status !== 0) fileDriver.set(name, value);
         return;
       }
-      const result = spawn('security', [
-        'add-generic-password',
-        '-U',
-        '-s',
-        'mudah',
-        '-a',
-        name,
-        '-w',
-        value,
-      ]);
-      if (result === null || result.status !== 0) fileDriver.set(name, value);
+      // macOS `security -w` puts the secret on argv (visible in `ps`).
+      // Writes go to the 0600 file backend instead.
+      fileDriver.set(name, value);
     },
     delete(name: string): boolean {
       const kind = resolve();

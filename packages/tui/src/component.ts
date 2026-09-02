@@ -42,6 +42,8 @@ export interface Component {
   paintExtras?(stream: { write(data: string): unknown }, x: number, y: number): void;
   /** Keymap labels for help footers. */
   keys?: Record<string, string>;
+  /** Advance time-based animation. Program calls this every paint. */
+  tick?(dtMs: number): void;
 }
 
 /** Base implementation with sensible defaults. */

@@ -157,4 +157,23 @@ describe('loadRemoteConfig', () => {
     expect(result).toEqual({ from: 'opt' });
     expect(stub.urls).toEqual(['https://example.com/from-opt.json']);
   });
+
+  it('rejects file: and private hosts', async () => {
+    await expect(loadRemoteConfig('file:///etc/passwd', { cacheDir })).rejects.toThrow(/http/);
+    await expect(
+      loadRemoteConfig('https://127.0.0.1/x.json', { cacheDir, fetch: fakeFetch({ a: 1 }) }),
+    ).rejects.toThrow(/private/);
+    await expect(
+      loadRemoteConfig('https://169.254.169.254/latest', { cacheDir, fetch: fakeFetch({ a: 1 }) }),
+    ).rejects.toThrow(/blocked/);
+  });
+
+  it('allows private hosts when allowPrivate is set', async () => {
+    const result = await loadRemoteConfig('https://127.0.0.1/c.json', {
+      cacheDir,
+      allowPrivate: true,
+      fetch: fakeFetch({ ok: true }),
+    });
+    expect(result).toEqual({ ok: true });
+  });
 });

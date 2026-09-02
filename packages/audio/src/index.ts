@@ -15,6 +15,8 @@ export {
   decodeMp3,
   looksLikeMp3,
   type DecodedMp3,
+  type DecodeMp3Options,
+  type Mp3Spawn,
 } from './mp3.js';
 export {
   parseTune,

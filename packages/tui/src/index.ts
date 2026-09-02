@@ -9,10 +9,12 @@ export {
   Breadcrumb,
   Calendar,
   Checkbox,
+  DatePicker,
   Label,
   List,
   MultiList,
   Panel,
+  Popover,
   ProgressBar,
   Radio,
   Spinner,
@@ -23,6 +25,10 @@ export {
   Tooltip,
   Viewport,
   type BreadcrumbItem,
+  type BreadcrumbOptions,
+  type CalendarOptions,
+  type CheckboxOptions,
+  type PopoverOptions,
   type TableColumnDef,
 } from './widgets.js';
 export {
@@ -62,6 +68,7 @@ export {
   type NotificationsOptions,
   type NotificationEntry,
   type MenuOptions,
+  type PickerOptions,
 } from './screens.js';
 export { Stack } from './stack.js';
 export { Overlay, type PaletteItem } from './overlay.js';
@@ -78,7 +85,7 @@ export { Chart, type ChartEntry, type ChartKind, type ChartOptions } from './cha
 export { fromLayout, parseLayout, compileLayout, LayoutSyntaxError, type LayoutNode } from './dsl.js';
 export { VideoFrames, VideoPlayer, type VideoPlayerOptions, type RgbaFrame } from './video.js';
 export { LayoutDebugger } from './debug-overlay.js';
-export { renderWidgetToText, renderWidgetTree } from './wasi.js';
+export { renderWidgetToText, renderWidgetToHtml, renderWidgetTree } from './wasi.js';
 export {
   SessionRecorder,
   parseSessionTape,
