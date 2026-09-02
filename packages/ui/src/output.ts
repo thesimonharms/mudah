@@ -145,6 +145,11 @@ export class Output {
     this.out.write(message + '\n');
   }
 
+  /** Write bytes with no extra newline. Used when piping a child command. */
+  write(data: string): void {
+    this.out.write(data);
+  }
+
   info(message: string): void {
     if (this.isMachineReadable) {
       this.writeJsonLine('info', message);

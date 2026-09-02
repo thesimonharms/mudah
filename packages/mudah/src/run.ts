@@ -759,13 +759,7 @@ function registerFrameworkBuiltIns(kernel: ConsoleKernel, seen: Set<string>): vo
   register({ default: TutorialCommand });
   register({ default: LspCommand });
   register({ default: ReplayCommand });
-  register({
-    default: class extends SandboxCommand {
-      constructor() {
-        super(kernel);
-      }
-    },
-  });
+  register({ default: SandboxCommand });
   register({ default: TestCommand });
   register({ default: StorybookCommand });
   register({ default: DeployCommand });

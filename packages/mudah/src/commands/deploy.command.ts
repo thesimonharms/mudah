@@ -1,37 +1,42 @@
 import { Command } from '@mudah-cli/console';
 import {
   buildDeployPlan,
+  defaultRsyncCopy,
   defaultSshProbe,
   defaultSshRun,
   executeDeployPlan,
   parseHosts,
+  type HostCopy,
   type HostProbe,
   type HostRun,
 } from '../deploy.js';
 
 /**
- * Built-in `deploy` command: multi-host rolling or parallel SSH probe, then
- * an optional remote command. Default is a plan-only dry-run. `--execute`
- * probes (bound `deploy.probe`, or SSH BatchMode). `--remote=` runs that
- * command on each host after a successful probe.
+ * Built-in `deploy` command: multi-host rolling or parallel SSH probe, optional
+ * rsync, then an optional remote command. Default is a plan-only dry-run.
  */
 export default class DeployCommand extends Command {
-  signature = 'deploy {host=localhost} [--rolling] [--execute] [--remote=]';
-  description = 'Plan (and optionally probe/run over SSH) a multi-host deploy';
-  static exitCodes = { 1: 'A host probe or remote command failed during --execute' };
+  signature = 'deploy {host=localhost} [--rolling] [--execute] [--remote=] [--source=] [--dest=]';
+  description = 'Plan (and optionally copy/run over SSH) a multi-host deploy';
+  static exitCodes = { 1: 'A host probe, copy, or remote command failed during --execute' };
 
   async handle(): Promise<number> {
     const hosts = parseHosts(this.arg('host'));
     const rolling = this.option('rolling') === true;
     const execute = this.option('execute') === true;
     const remoteRaw = this.option('remote');
+    const sourceRaw = this.option('source');
+    const destRaw = this.option('dest');
     const remote = typeof remoteRaw === 'string' && remoteRaw.length > 0 ? remoteRaw : undefined;
-    const plan = buildDeployPlan(hosts, rolling, !execute, remote);
+    const source = typeof sourceRaw === 'string' && sourceRaw.length > 0 ? sourceRaw : undefined;
+    const dest = typeof destRaw === 'string' && destRaw.length > 0 ? destRaw : undefined;
+    const plan = buildDeployPlan(hosts, rolling, !execute, { remote, source, dest });
 
     this.output.section('Deploy plan');
     this.output.keyValue('mode', plan.mode);
     this.output.keyValue('hosts', String(plan.hosts.length));
     this.output.keyValue('dry-run', plan.dryRun ? 'yes' : 'no');
+    if (plan.source && plan.dest) this.output.keyValue('copy', `${plan.source} -> ${plan.dest}`);
     if (plan.remote) this.output.keyValue('remote', plan.remote);
     for (const entry of plan.hosts) {
       const wave = plan.mode === 'rolling' ? `wave ${entry.wave}/${plan.hosts.length}` : 'parallel';
@@ -40,9 +45,7 @@ export default class DeployCommand extends Command {
 
     if (!execute) {
       this.output.muted(
-        plan.remote
-          ? 'No SSH — this is a plan only. Pass --execute to probe hosts and run the remote command.'
-          : 'No SSH — this is a plan only. Pass --execute to probe hosts, and --remote=cmd to run a command.',
+        'No SSH — this is a plan only. Pass --execute to probe, --source and --dest to copy, --remote=cmd to run.',
       );
       this.output.success('deploy plan ready');
       return 0;
@@ -56,7 +59,12 @@ export default class DeployCommand extends Command {
       : plan.remote
         ? defaultSshRun
         : undefined;
-    const { results } = await executeDeployPlan(plan, { probe, run });
+    const copy: HostCopy | undefined = this.app.has('deploy.copy')
+      ? this.app.make<HostCopy>('deploy.copy')
+      : plan.source
+        ? defaultRsyncCopy
+        : undefined;
+    const { results } = await executeDeployPlan(plan, { probe, run, copy });
     for (const result of results) {
       const line = `${result.host}  ${result.ok ? 'ok' : 'fail'}  ${result.latencyMs}ms`;
       this.output.raw(`  ${line}${result.detail ? `  ${result.detail}` : ''}\n`);

@@ -488,6 +488,14 @@ describe('Viewport', () => {
     expect(viewport.onKey(key('enter'))).toBe(true);
   });
 
+  it('lets a focusable child consume arrows before scrolling', () => {
+    const table = new Table([{ header: 'n' }], [['a'], ['b']]);
+    const viewport = new Viewport(table, 5);
+    expect(viewport.onKey(key('down'))).toBe(true);
+    expect(table.selectedIndex).toBe(1);
+    expect(viewport.scrollTop).toBe(0);
+  });
+
   it('resizes without losing the scroll position', () => {
     const viewport = new Viewport(new Label(longLines.join('\n')), 5);
     viewport.scrollTo(10);

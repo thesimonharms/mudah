@@ -82,7 +82,29 @@ export function completionItems(params: unknown): CompletionItem[] {
       documentation: `mudah.json field: ${entry.detail}`,
     }));
   }
-  return SIGNATURE_SNIPPETS;
+  const text = documents.get(uri) ?? '';
+  const fromFile = commandSignatureItems(text);
+  return fromFile.length > 0 ? [...fromFile, ...SIGNATURE_SNIPPETS] : SIGNATURE_SNIPPETS;
+}
+
+/** Pull `signature = '...'` strings from an open `*.command.ts` buffer. */
+export function commandSignatureItems(text: string): CompletionItem[] {
+  const out: CompletionItem[] = [];
+  const seen = new Set<string>();
+  const re = /signature\s*=\s*(['"`])([^'"`]+)\1/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    const signature = match[2]!;
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    out.push({
+      label: signature,
+      kind: 15,
+      detail: 'command signature',
+      documentation: 'Signature declared in this command file.',
+    });
+  }
+  return out;
 }
 
 export interface LspDiagnostic {
@@ -175,10 +197,17 @@ export function publishDiagnostics(uri: string): LspMessage | undefined {
 
 export function hoverContents(params: unknown): { kind: 'markdown'; value: string } | null {
   const uri = uriOf(params);
-  if (!(uri.endsWith('mudah.json') || uri.includes('mudah.json'))) return null;
   const pos = (params as { position?: { line?: number; character?: number } }).position;
   const text = documents.get(uri) ?? '';
   const line = text.split('\n')[pos?.line ?? 0] ?? '';
+  if (uri.endsWith('.command.ts') || uri.includes('.command.ts')) {
+    const match = /signature\s*=\s*(['"`])([^'"`]+)\1/.exec(line) ?? /signature\s*=\s*(['"`])([^'"`]+)\1/.exec(text);
+    if (match) {
+      return { kind: 'markdown', value: `Command signature \`${match[2]}\`.` };
+    }
+    return { kind: 'markdown', value: 'Mudah command module. Set `signature` and `handle()`.' };
+  }
+  if (!(uri.endsWith('mudah.json') || uri.includes('mudah.json'))) return null;
   for (const entry of MANIFEST_KEYS) {
     if (line.includes(`"${entry.label}"`) || line.includes(`'${entry.label}'`)) {
       return { kind: 'markdown', value: `**${entry.label}** — ${entry.detail}` };

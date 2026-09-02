@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, withSandbox, buildDeployPlan, executeDeployPlan, mudahJsonDiagnostics, applyPluginUpdate } from '@mudah-cli/mudah';
+import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, withSandbox, buildDeployPlan, executeDeployPlan, mudahJsonDiagnostics, applyPluginUpdate, commandSignatureItems, stageSandboxTree } from '@mudah-cli/mudah';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'speculative');
@@ -337,5 +337,48 @@ describe('production speculative helpers', () => {
       stderr: '',
     }));
     expect(result.ok).toBe(true);
+  });
+
+  it('copies files after a successful probe', async () => {
+    const plan = buildDeployPlan(['a.example'], true, false, { source: 'dist', dest: '/opt/app' });
+    const copied: string[] = [];
+    const { results } = await executeDeployPlan(plan, {
+      probe: async () => ({ ok: true, latencyMs: 1, detail: 'probe' }),
+      copy: async (host, source, dest) => {
+        copied.push(`${host}:${source}:${dest}`);
+        return { ok: true, latencyMs: 3, detail: 'rsync' };
+      },
+    });
+    expect(copied).toEqual(['a.example:dist:/opt/app']);
+    expect(results[0]?.ok).toBe(true);
+  });
+
+  it('completes signatures from an open command file', () => {
+    handleLspMessage({
+      jsonrpc: '2.0',
+      method: 'textDocument/didOpen',
+      params: {
+        textDocument: {
+          uri: 'file:///app/src/commands/hello.command.ts',
+          text: "export default class Hello { signature = 'hello {name?}'; }\n",
+        },
+      },
+    });
+    const reply = handleLspMessage({
+      jsonrpc: '2.0',
+      id: 8,
+      method: 'textDocument/completion',
+      params: { textDocument: { uri: 'file:///app/src/commands/hello.command.ts' } },
+    });
+    const items = reply?.result as Array<{ label: string }>;
+    expect(items.map((i) => i.label)).toContain('hello {name?}');
+    expect(commandSignatureItems("signature = 'deploy {host}'").map((i) => i.label)).toEqual(['deploy {host}']);
+  });
+
+  it('stages app files into the sandbox tree', () => {
+    const dest = join(appDir, 'staged');
+    const copied = stageSandboxTree(appDir, dest);
+    expect(copied).toContain('mudah.json');
+    expect(copied).toContain('src');
   });
 });

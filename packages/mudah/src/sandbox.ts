@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
@@ -218,4 +218,21 @@ export async function withSandbox<T>(options: SandboxOptions, fn: () => Promise<
   } finally {
     session.restore();
   }
+}
+
+const STAGE_NAMES = ['mudah.json', 'src', 'bin', 'config', 'package.json'] as const;
+
+/**
+ * Copy the app files a sandboxed command needs into `to`. Skips missing
+ * names. Does not copy `node_modules`.
+ */
+export function stageSandboxTree(from: string, to: string): string[] {
+  const copied: string[] = [];
+  for (const name of STAGE_NAMES) {
+    const src = join(from, name);
+    if (!fs.existsSync(src)) continue;
+    fs.cpSync(src, join(to, name), { recursive: true });
+    copied.push(name);
+  }
+  return copied;
 }

@@ -13,6 +13,7 @@ import {
   Split,
   VideoFrames,
   VideoPlayer,
+  StorybookGallery,
   Table,
   compileLayout,
   fromLayout,
@@ -203,5 +204,21 @@ describe('speculative TUI surfaces', () => {
     expect(html).toContain('<pre class="mudah-widget">');
     expect(html).toContain('class="mudah-text"');
     expect(html).toContain('Hello');
+  });
+
+  it('cycles storybook gallery stories with left and right', () => {
+    const gallery = new StorybookGallery(
+      [
+        { name: 'one', build: () => new Column().add(new Label('first-story')) },
+        { name: 'two', build: () => new Column().add(new Label('second-story')) },
+      ],
+      24,
+      6,
+    );
+    const tui = TestTui.mount(gallery, { cols: 24, rows: 8 });
+    expect(tui.snapshot()).toContain('first-story');
+    tui.send('right');
+    expect(gallery.current).toBe('two');
+    expect(tui.snapshot()).toContain('second-story');
   });
 });

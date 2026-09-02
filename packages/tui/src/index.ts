@@ -97,3 +97,4 @@ export {
   type SessionTape,
 } from './record.js';
 export { widgetReference, widgetReferenceMarkdown, type WidgetRef } from './reference.js';
+export { StorybookGallery, type StoryFactory } from './gallery.js';

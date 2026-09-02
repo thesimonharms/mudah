@@ -130,7 +130,10 @@ describe('TUI widgets', () => {
     // The viewport clips a 30-row table down to its declared height.
     expect(viewport.render()).toHaveLength(10);
     viewport.onKey({ name: 'down' });
-    expect(viewport.scrollTop).toBe(1);
+    expect(table.selectedIndex).toBe(1);
+    expect(viewport.scrollTop).toBe(0);
+    viewport.onKey({ name: 'page-down' });
+    expect(viewport.scrollTop).toBeGreaterThan(0);
   });
 
   it('scrolls the table with the mouse wheel', async () => {

@@ -110,11 +110,9 @@ export class VideoPlayer extends BaseComponent {
   render(): string[] {
     const current = this.pixels[this.index];
     if (current) {
-      if (this.kitty) {
-        const rows = Math.max(1, Math.ceil(current.height / 2));
-        return Array.from({ length: rows }, () => '');
-      }
-      return encodeHalfBlocks(current.pixels, current.width, current.height, current.format);
+      const rows = encodeHalfBlocks(current.pixels, current.width, current.height, current.format);
+      const status = this.paused ? 'paused' : 'play';
+      return [...rows, `${status}  ${this.index + 1}/${this.length}  ${this.seconds.toFixed(2)}s`];
     }
     const rows = this.ascii[this.index] ?? this.ascii[0] ?? [];
     const status = this.paused ? 'paused' : 'play';

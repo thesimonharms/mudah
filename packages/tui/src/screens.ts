@@ -5,7 +5,7 @@ import { BaseComponent } from './component.js';
 import type { Program } from './program.js';
 import { HelpFooter } from './chrome.js';
 import { keys } from './keymap.js';
-import { Label, List, Panel, Table, Viewport, type TableColumnDef } from './widgets.js';
+import { Label, List, Panel, Table, type TableColumnDef } from './widgets.js';
 import { Tree, type TreeNodeData } from './extras.js';
 import { FuzzyList } from './fuzzy.js';
 import { Form } from './form.js';
@@ -235,10 +235,7 @@ export class DashboardScreen extends ScreenHandle<number> {
     const sidebar = new Panel(options.title ?? 'Summary', options.sidebar ?? []);
     this.root = new Column().add(
       new Label(options.title ?? 'Dashboard'),
-      new Split({ axis: 'horizontal', ratio: options.ratio ?? 0.35 }).add(
-        sidebar,
-        new Viewport(this.table, 12),
-      ),
+      new Split({ axis: 'horizontal', ratio: options.ratio ?? 0.35 }).add(sidebar, this.table),
       new HelpFooter({ ...keys.table, ...keys.split, escape: 'quit' }),
     );
   }
@@ -266,7 +263,7 @@ export class TableScreen extends ScreenHandle<string[] | number> {
     this.table = new Table(options.columns, options.rows, onSelect);
     this.root = new Column().add(
       new Label(options.title ?? 'Table'),
-      new Viewport(this.table, 12),
+      this.table,
       new HelpFooter({ ...keys.table, escape: 'quit' }),
     );
   }

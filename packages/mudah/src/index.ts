@@ -6,24 +6,28 @@ export {
   completionItems,
   hoverContents,
   mudahJsonDiagnostics,
+  commandSignatureItems,
   publishDiagnostics,
   encodeLspFrame,
   decodeLspFrames,
   type LspMessage,
   type LspDiagnostic,
 } from './lsp.js';
-export { enterSandbox, withSandbox, type SandboxSession } from './sandbox.js';
+export { enterSandbox, withSandbox, stageSandboxTree, type SandboxSession } from './sandbox.js';
 export {
   buildDeployPlan,
   executeDeployPlan,
   parseHosts,
   defaultSshProbe,
   defaultSshRun,
+  defaultRsyncCopy,
   validateHost,
   validateRemote,
+  validateDeployPath,
   type DeployPlan,
   type HostProbe,
   type HostRun,
+  type HostCopy,
 } from './deploy.js';
 export { fetchLatestVersion, applyPluginUpdate } from './commands/plugins.update.command.js';
 export { normalizeAutocompleteShell, renderAutocompleteScript, type AutocompleteShell } from './autocomplete.js';

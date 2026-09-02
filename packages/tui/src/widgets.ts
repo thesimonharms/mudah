@@ -364,6 +364,7 @@ export class Viewport extends BaseComponent {
   }
 
   override onKey(event: KeyEvent): boolean {
+    if (this.child.onKey?.(event)) return true;
     switch (event.name) {
       case 'up':
         this.scrollBy(-1);
@@ -384,8 +385,12 @@ export class Viewport extends BaseComponent {
         this.scrollTo(this.maxScroll);
         return true;
       default:
-        return this.child.onKey?.(event) ?? false;
+        return false;
     }
+  }
+
+  tick(dtMs: number): void {
+    this.child.tick?.(dtMs);
   }
 
   override onMouse(event: MouseEvent): boolean {

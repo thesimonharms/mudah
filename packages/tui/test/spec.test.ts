@@ -147,9 +147,7 @@ describe('Screen.table', () => {
     const tui = TestTui.mount(screen.root, { cols: 60, rows: 10 });
     expect(tui.snapshot()).toContain('Hosts');
     expect(tui.snapshot()).toContain('db');
-    // Move to the second row, then confirm — fires onSelect with the row.
-    screen.table.move(1);
-    screen.table.confirm();
+    tui.send('down').send('enter');
     expect(screen.result()).toEqual(['web', 'down']);
   });
 
