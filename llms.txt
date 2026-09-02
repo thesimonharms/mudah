@@ -13,8 +13,8 @@ Commands: one file, default export, `signature` string `{arg?} [--flag]`. Groups
 Prompts: `this.select` / `this.confirm` / `this.password`. Not a Program.
 Tests: `TestApp.create({ cwd }).dispatch(['cmd']).exit(0).outContains('...')`.
 
-Built-ins include `make`, `doctor`, `tutorial`, `docs:widgets`, `lsp`, `replay`, `sandbox`,
-`test`, `storybook`, `deploy`, `watch` (dev wrapper), `dev`.
+Built-ins include `make`, `doctor`, `tutorial`, `docs:widgets`, `lsp`, `replay`,
+`test`, `storybook`, `watch` (dev wrapper), `dev`.
 
 ## TUI: one way
 
@@ -77,7 +77,9 @@ tui.tree();     // JSON { role, name, value, focused, bounds, children }
 
 `SessionRecorder` `{ record(action), dump(), tape(), replay(tui) }` — no PTY. Timed replay: `replayTapeAsync`.
 `fromLayout` / `parseLayout` / `compileLayout` (`column|row|split|label|list|panel|checkbox|progress`).
-`VideoPlayer` (half-block / Kitty, pause/seek). `LayoutDebugger` overlay. `renderWidgetToText` (no process I/O).
+`VideoPlayer` (half-block / Kitty, pause/seek). `LayoutDebugger` overlay.
+`renderWidgetToText` / `renderWidgetToHtml` — headless, no process I/O. Import
+`@mudah-cli/tui/wasi` (alias `@mudah-cli/tui/headless`) to skip Program.
 
 No PTY. No Ink. No Blessed. No raw `\x1b[` in app code.
 

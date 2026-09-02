@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { Command } from '@mudah-cli/console';
 import { formatGraph, pluginGraph, type PluginInfo } from '@mudah-cli/core';
 import { detectCapabilities } from '@mudah-cli/terminal';
-import { Column, Label, List, dumpTree } from '@mudah-cli/tui';
 
 /**
  * Built-in `doctor` command: a quick health check of the runtime, manifest,
@@ -20,6 +19,7 @@ export default class DoctorCommand extends Command {
       this.app.config().get('mudah.a11yTree') === true ||
       process.env['MUDAH_A11Y_TREE'] === '1';
 
+    const { Column, Label, List, dumpTree } = await import('@mudah-cli/tui');
     const demo = new Column().add(new Label('demo'), new List(['a', 'b']));
     demo.resize(40, 8);
     const tree = dumpTree(demo);

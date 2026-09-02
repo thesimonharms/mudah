@@ -13,22 +13,6 @@ export {
   type LspMessage,
   type LspDiagnostic,
 } from './lsp.js';
-export { enterSandbox, withSandbox, stageSandboxTree, type SandboxSession } from './sandbox.js';
-export {
-  buildDeployPlan,
-  executeDeployPlan,
-  parseHosts,
-  defaultSshProbe,
-  defaultSshRun,
-  defaultRsyncCopy,
-  validateHost,
-  validateRemote,
-  validateDeployPath,
-  type DeployPlan,
-  type HostProbe,
-  type HostRun,
-  type HostCopy,
-} from './deploy.js';
 export { fetchLatestVersion, applyPluginUpdate } from './commands/plugins.update.command.js';
 export { normalizeAutocompleteShell, renderAutocompleteScript, type AutocompleteShell } from './autocomplete.js';
 
@@ -47,7 +31,6 @@ export {
   compareSemVer,
   createTelemetry,
   defaultCacheDir,
-  defaultMigrationTable,
   discoverPlugins,
   findPluginPackages,
   formatGraph,
@@ -55,14 +38,12 @@ export {
   gatePlugin,
   loadManifest,
   loadPlugin,
-  MigrationRunner,
   parseSemVer,
   pluginGraph,
   setLocale,
   t,
   type MudahManifest,
   type LazyProviderOptions,
-  type Migration,
   type PluginDiscoveryOptions,
   type PluginInfo,
   type ProviderClass,

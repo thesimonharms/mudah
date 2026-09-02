@@ -31,13 +31,6 @@ export {
 } from './plugins.js';
 export { createTelemetry, type Telemetry, type TelemetryEvent, type TelemetryOptions, type TelemetrySink } from './telemetry.js';
 export { addMessages, getLocale, setLocale, t, type MessageDict } from './i18n.js';
-export {
-  MigrationRunner,
-  defaultMigrationTable,
-  type Migration,
-  type MigrationRunResult,
-  type MigrationState,
-} from './migrations.js';
 export { formatGraph, pluginGraph, type GraphEdge, type ProviderGraph } from './graph.js';
 export {
   checkForUpdate,

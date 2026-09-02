@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { Command } from '@mudah-cli/console';
-import { Column, Label, parseSessionTape, replayTapeAsync, type ReplayHandle, type SessionTape } from '@mudah-cli/tui';
-import { TestTui } from '@mudah-cli/testing';
+import type { ReplayHandle, SessionTape } from '@mudah-cli/tui';
 
 /**
  * Built-in `replay` command: print or apply a structured session tape.
@@ -18,6 +17,7 @@ export default class ReplayCommand extends Command {
       return 0;
     }
 
+    const { parseSessionTape, replayTapeAsync, Column, Label } = await import('@mudah-cli/tui');
     let tape: SessionTape;
     try {
       tape = parseSessionTape(JSON.parse(await readFile(file, 'utf8')));
@@ -35,6 +35,7 @@ export default class ReplayCommand extends Command {
     }
 
     if (this.option('play') === true) {
+      const { TestTui } = await import('@mudah-cli/testing');
       const target: ReplayHandle = this.app.has('replay.target')
         ? this.app.make<ReplayHandle>('replay.target')
         : TestTui.mount(new Column().add(new Label('replay')), {
@@ -42,8 +43,8 @@ export default class ReplayCommand extends Command {
             rows: tape.rows ?? 24,
           });
       await replayTapeAsync(target, tape, { speed: Number(this.option('speed') ?? 1) || 1 });
-      if ('snapshot' in target && typeof (target as TestTui).snapshot === 'function') {
-        this.output.raw(`${(target as TestTui).snapshot()}\n`);
+      if ('snapshot' in target && typeof (target as { snapshot?: () => string }).snapshot === 'function') {
+        this.output.raw(`${(target as { snapshot: () => string }).snapshot()}\n`);
       }
     }
 

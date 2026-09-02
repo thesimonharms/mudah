@@ -19,8 +19,6 @@ const EN: MessageDict = {
   'plugins.reloaded': 'Plugins reloaded',
   'prompt.continue': 'Continue?',
   'cache.empty': 'Cache is empty',
-  'migrate.empty': 'No migrations to apply',
-  'audit.clean': 'No plugin issues found',
 };
 
 /** Merge `dict` into the catalog for `locale` (later keys win). */

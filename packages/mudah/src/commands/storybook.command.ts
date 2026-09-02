@@ -1,24 +1,20 @@
 import { Command } from '@mudah-cli/console';
-import { TestTui } from '@mudah-cli/testing';
-import {
-  Calendar,
-  Chart,
-  Checkbox,
-  Column,
-  DatePicker,
-  Label,
-  List,
-  Pager,
-  Program,
-  ProgressBar,
-  StorybookGallery,
-  Table,
-  Toolbar,
-  type Layout,
-  type StoryFactory,
-} from '@mudah-cli/tui';
+import type { Layout, StoryFactory } from '@mudah-cli/tui';
 
-function stories(): StoryFactory[] {
+async function stories(): Promise<StoryFactory[]> {
+  const {
+    Calendar,
+    Chart,
+    Checkbox,
+    Column,
+    DatePicker,
+    Label,
+    List,
+    Pager,
+    ProgressBar,
+    Table,
+    Toolbar,
+  } = await import('@mudah-cli/tui');
   return [
     { name: 'label', build: () => new Column().add(new Label('Label story')) },
     { name: 'list', build: () => new Column().add(new Label('List story'), new List(['alpha', 'beta'])) },
@@ -57,10 +53,6 @@ function stories(): StoryFactory[] {
   ];
 }
 
-function snapshot(root: Layout, cols: number, rows: number): string {
-  return TestTui.mount(root, { cols, rows }).snapshot();
-}
-
 /**
  * Built-in `storybook` command: widget gallery. Prints snapshots when not a
  * TTY. On a TTY, opens a Program: left/right pick a widget, +/− resize.
@@ -73,7 +65,7 @@ export default class StorybookCommand extends Command {
     const cols = Number(this.option('cols') ?? 40) || 40;
     const rows = Number(this.option('rows') ?? 8) || 8;
     const filter = this.arg('widget');
-    const all = stories();
+    const all = await stories();
     const shown = filter ? all.filter((entry) => entry.name === filter) : all;
     if (shown.length === 0) {
       throw this.usageError(`Unknown widget "${filter}".`, `Known: ${all.map((s) => s.name).join(', ')}`);
@@ -81,11 +73,16 @@ export default class StorybookCommand extends Command {
 
     const tty = process.stdin.isTTY === true && process.stdout.isTTY === true;
     if (tty && process.env['VITEST'] === undefined) {
+      const { Program, StorybookGallery } = await import('@mudah-cli/tui');
       const gallery = new StorybookGallery(shown, cols, rows);
       const program = new Program();
       program.mount(gallery);
       return program.run();
     }
+
+    const { TestTui } = await import('@mudah-cli/testing');
+    const snapshot = (root: Layout, width: number, height: number): string =>
+      TestTui.mount(root, { cols: width, rows: height }).snapshot();
 
     this.output.section(`Storybook ${cols}x${rows}`);
     for (const entry of shown) {

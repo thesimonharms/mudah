@@ -3,12 +3,10 @@ import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
-import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, withSandbox, buildDeployPlan, executeDeployPlan, mudahJsonDiagnostics, applyPluginUpdate, commandSignatureItems, stageSandboxTree } from '@mudah-cli/mudah';
+import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, mudahJsonDiagnostics, applyPluginUpdate, commandSignatureItems } from '@mudah-cli/mudah';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'speculative');
-const nodeFs = createRequire(import.meta.url)('node:fs') as typeof import('node:fs');
 
 function liveStreams(): {
   stdout: { write(data: string): void };
@@ -148,21 +146,6 @@ describe('built-in speculative commands', () => {
     expect(result.code).toBe(0);
   });
 
-  it('deploy prints a rolling plan', async () => {
-    const result = await invoke(['deploy', 'a.example,b.example', '--rolling']);
-    expect(result.code).toBe(0);
-    expect(result.out).toContain('rolling');
-    expect(result.out).toContain('a.example');
-    expect(result.out).toContain('No SSH');
-  });
-
-  it('sandbox sets env and runs a command', async () => {
-    const result = await invoke(['sandbox', 'hello']);
-    expect(result.code).toBe(0);
-    expect(result.out).toContain('MUDAH_SANDBOX=1');
-    expect(result.out).toContain('hello there');
-  });
-
   it('replay prints structured events', async () => {
     const file = join(appDir, 'session.json');
     await writeFile(
@@ -185,11 +168,6 @@ describe('built-in speculative commands', () => {
     expect(result.out).toContain('List story');
     expect(result.out).toContain('Toolbar story');
     expect(result.out).toContain('Table story');
-  });
-
-  it('migrate exits 0 with an empty set', async () => {
-    const result = await invoke(['migrate']);
-    expect(result.code).toBe(0);
   });
 
   it('docs:widgets prints inspect() roles', async () => {
@@ -238,90 +216,6 @@ describe('production speculative helpers', () => {
     expect(result.out).not.toContain('Toolbar story');
   });
 
-  it('blocks fetch inside withSandbox and restores cwd', async () => {
-    const here = process.cwd();
-    let sawSandbox = false;
-    await withSandbox({ cwd: appDir }, async () => {
-      expect(process.env['MUDAH_SANDBOX']).toBe('1');
-      sawSandbox = true;
-      await expect(fetch('https://example.invalid')).rejects.toThrow(/network is disabled/);
-    });
-    expect(sawSandbox).toBe(true);
-    expect(process.cwd()).toBe(here);
-    expect(process.env['MUDAH_SANDBOX']).not.toBe('1');
-  });
-
-  it('executes a rolling deploy plan host by host', async () => {
-    const plan = buildDeployPlan(['a.example', 'b.example'], true, false);
-    expect(plan.mode).toBe('rolling');
-    const seen: string[] = [];
-    const { results } = await executeDeployPlan(plan, async (host) => {
-      seen.push(host);
-      return { ok: host === 'a.example', latencyMs: 1, detail: 'probe' };
-    });
-    expect(seen).toEqual(['a.example', 'b.example']);
-    expect(results[0]?.ok).toBe(true);
-    expect(results[1]?.ok).toBe(false);
-  });
-
-  it('stops a rolling deploy on the first failed host', async () => {
-    const plan = buildDeployPlan(['a.example', 'b.example', 'c.example'], true, false);
-    const seen: string[] = [];
-    const { results } = await executeDeployPlan(plan, async (host) => {
-      seen.push(host);
-      return { ok: false, latencyMs: 1, detail: 'down' };
-    });
-    expect(seen).toEqual(['a.example']);
-    expect(results).toHaveLength(1);
-  });
-
-  it('throws when --execute has no probe', async () => {
-    const plan = buildDeployPlan(['a.example'], true, false);
-    await expect(executeDeployPlan(plan)).rejects.toThrow(/probe/);
-  });
-
-  it('strips NODE_OPTIONS inside the sandbox', async () => {
-    process.env['NODE_OPTIONS'] = '--require ./evil.js';
-    await withSandbox({ cwd: appDir }, () => {
-      expect(process.env['NODE_OPTIONS']).toBeUndefined();
-    });
-  });
-
-  it('blocks writes outside the sandbox cwd', async () => {
-    await withSandbox({ cwd: appDir }, () => {
-      nodeFs.writeFileSync(join(appDir, 'inside.txt'), 'ok');
-      expect(() => nodeFs.writeFileSync('/etc/mudah-sandbox-should-fail', 'no')).toThrow(/outside cwd/);
-    });
-  });
-
-  it('runs a remote command after a successful probe', async () => {
-    const plan = buildDeployPlan(['a.example', 'b.example'], true, false, 'systemctl restart app');
-    const ran: string[] = [];
-    const { results } = await executeDeployPlan(plan, {
-      probe: async () => ({ ok: true, latencyMs: 1, detail: 'probe' }),
-      run: async (host, command) => {
-        ran.push(`${host}:${command}`);
-        return { ok: true, latencyMs: 2, detail: 'run' };
-      },
-    });
-    expect(ran).toEqual(['a.example:systemctl restart app', 'b.example:systemctl restart app']);
-    expect(results.every((row) => row.ok)).toBe(true);
-  });
-
-  it('skips the remote command when the probe fails', async () => {
-    const plan = buildDeployPlan(['a.example'], false, false, 'true');
-    let ran = 0;
-    const { results } = await executeDeployPlan(plan, {
-      probe: async () => ({ ok: false, latencyMs: 1, detail: 'down' }),
-      run: async () => {
-        ran += 1;
-        return { ok: true, latencyMs: 0 };
-      },
-    });
-    expect(ran).toBe(0);
-    expect(results[0]?.ok).toBe(false);
-  });
-
   it('flags unknown mudah.json keys', () => {
     const items = mudahJsonDiagnostics(
       'file:///app/mudah.json',
@@ -337,20 +231,6 @@ describe('production speculative helpers', () => {
       stderr: '',
     }));
     expect(result.ok).toBe(true);
-  });
-
-  it('copies files after a successful probe', async () => {
-    const plan = buildDeployPlan(['a.example'], true, false, { source: 'dist', dest: '/opt/app' });
-    const copied: string[] = [];
-    const { results } = await executeDeployPlan(plan, {
-      probe: async () => ({ ok: true, latencyMs: 1, detail: 'probe' }),
-      copy: async (host, source, dest) => {
-        copied.push(`${host}:${source}:${dest}`);
-        return { ok: true, latencyMs: 3, detail: 'rsync' };
-      },
-    });
-    expect(copied).toEqual(['a.example:dist:/opt/app']);
-    expect(results[0]?.ok).toBe(true);
   });
 
   it('completes signatures from an open command file', () => {
@@ -372,13 +252,6 @@ describe('production speculative helpers', () => {
     });
     const items = reply?.result as Array<{ label: string }>;
     expect(items.map((i) => i.label)).toContain('hello {name?}');
-    expect(commandSignatureItems("signature = 'deploy {host}'").map((i) => i.label)).toEqual(['deploy {host}']);
-  });
-
-  it('stages app files into the sandbox tree', () => {
-    const dest = join(appDir, 'staged');
-    const copied = stageSandboxTree(appDir, dest);
-    expect(copied).toContain('mudah.json');
-    expect(copied).toContain('src');
+    expect(commandSignatureItems("signature = 'hello {name?}'").map((i) => i.label)).toEqual(['hello {name?}']);
   });
 });

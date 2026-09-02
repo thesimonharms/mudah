@@ -85,7 +85,7 @@ export { Chart, type ChartEntry, type ChartKind, type ChartOptions } from './cha
 export { fromLayout, parseLayout, compileLayout, LayoutSyntaxError, type LayoutNode } from './dsl.js';
 export { VideoFrames, VideoPlayer, type VideoPlayerOptions, type RgbaFrame } from './video.js';
 export { LayoutDebugger } from './debug-overlay.js';
-export { renderWidgetToText, renderWidgetToHtml, renderWidgetTree } from './wasi.js';
+export { renderWidgetToText, renderWidgetToHtml, renderWidgetTree } from './headless.js';
 export {
   SessionRecorder,
   parseSessionTape,

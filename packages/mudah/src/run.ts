@@ -16,38 +16,10 @@ import {
 import { detectCapabilities, osc, type TerminalCapabilities, type ThemeQueryInput } from '@mudah-cli/terminal';
 import { Output, detectTheme, renderTable } from '@mudah-cli/ui';
 import { ConsoleKernel, renderError, renderCommandHelp, renderCommandList, parseSignature, type CommandModule } from '@mudah-cli/console';
-import { Column, Label, List, dumpTree } from '@mudah-cli/tui';
 import { normalizeAutocompleteShell, renderAutocompleteScript } from './autocomplete.js';
+import { registerWantedFrameworkBuiltIns } from './built-ins.js';
 import HelpCommand from './commands/help.command.js';
 import VersionCommand from './commands/version.command.js';
-import MakeCommand from './commands/make.command.js';
-import BuildCommand from './commands/build.command.js';
-import DoctorCommand from './commands/doctor.command.js';
-import ConfigShowCommand from './commands/config.show.command.js';
-import ConfigDiffCommand from './commands/config.diff.command.js';
-import ConfigSetCommand from './commands/config.set.command.js';
-import ConfigSourceCommand from './commands/config.source.command.js';
-import ConfigValidateCommand from './commands/config.validate.command.js';
-import DevCommand from './commands/dev.command.js';
-import InfoCommand from './commands/info.command.js';
-import TutorialCommand from './commands/tutorial.command.js';
-import LspCommand from './commands/lsp.command.js';
-import ReplayCommand from './commands/replay.command.js';
-import SandboxCommand from './commands/sandbox.command.js';
-import TestCommand from './commands/test.command.js';
-import StorybookCommand from './commands/storybook.command.js';
-import DeployCommand from './commands/deploy.command.js';
-import WatchCommand from './commands/watch.command.js';
-import DocsWidgetsCommand from './commands/docs.widgets.command.js';
-import PluginsListCommand from './commands/plugins.list.command.js';
-import PluginsUpdateCommand from './commands/plugins.update.command.js';
-import PluginsWatchCommand from './commands/plugins.watch.command.js';
-import MigrateCommand from './commands/migrate.command.js';
-import AuditCommand from './commands/audit.command.js';
-import CacheCommand from './commands/cache.command.js';
-import GraphCommand from './commands/graph.command.js';
-import AutocompleteCommand from './commands/autocomplete.command.js';
-import CompleteCommand from './commands/complete.command.js';
 
 /** Parsed timeout in milliseconds. */
 function parseTimeout(value: string): number {
@@ -442,10 +414,6 @@ export async function run(options: RunOptions = {}): Promise<number> {
     }
   }
 
-  // Framework built-ins fill remaining names so an app `deploy`/`test`/`watch`
-  // keeps precedence over the ROADMAP defaults.
-  registerFrameworkBuiltIns(kernel, seen);
-
   // Strip the global flags before dispatch so commands don't see them as
   // unknown options; remember the command name for envelopes/errors.
   const dispatchArgv = argv.filter(
@@ -460,10 +428,21 @@ export async function run(options: RunOptions = {}): Promise<number> {
       !a.startsWith('--autocomplete'),
   );
   const commandName = dispatchArgv[0];
+  const first = dispatchArgv[0];
+  const listing =
+    first === undefined ||
+    first === '--help' ||
+    first === '-h' ||
+    first === 'help' ||
+    first === 'complete';
+
+  // Framework built-ins fill remaining names so an app `test`/`watch`
+  // keeps precedence. Load only the argv needs, except help/complete.
+  await registerWantedFrameworkBuiltIns(kernel, seen, dispatchArgv, listing);
 
   // Global flags.
-  const [first] = dispatchArgv;
   if (flags.a11yTree) {
+    const { Column, Label, List, dumpTree } = await import('@mudah-cli/tui');
     const demo = new Column().add(new Label('a11y'), new List(['a', 'b']));
     demo.resize(40, 8);
     stdout.write(`${JSON.stringify(dumpTree(demo))}\n`);
@@ -551,6 +530,15 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const candidates = kernel.complete(rest);
     stdout.write(candidates.length > 0 ? `${candidates.join('\n')}\n` : '');
     return 0;
+  }
+
+  if (
+    first !== undefined &&
+    !listing &&
+    !kernel.has(first) &&
+    !kernel.hasGroup(first)
+  ) {
+    await registerWantedFrameworkBuiltIns(kernel, seen, dispatchArgv, true);
   }
 
   try {
@@ -694,74 +682,4 @@ function registerReservedBuiltIns(kernel: ConsoleKernel): void {
     },
   });
   kernel.register({ default: VersionCommand });
-}
-
-function nameTaken(seen: Set<string>, name: string): boolean {
-  if (seen.has(name)) return true;
-  const prefix = `${name}:`;
-  for (const existing of seen) {
-    if (existing.startsWith(prefix)) return true;
-  }
-  return false;
-}
-
-function registerIfFree(kernel: ConsoleKernel, seen: Set<string>, module: CommandModule): void {
-  try {
-    const name = parseSignature(new module.default().signature ?? '').name;
-    if (name === '' || nameTaken(seen, name)) return;
-    seen.add(name);
-    kernel.register(module);
-  } catch {
-    // Signature-less modules are skipped; kernel.register throws elsewhere.
-  }
-}
-
-function registerFrameworkBuiltIns(kernel: ConsoleKernel, seen: Set<string>): void {
-  const register = (module: CommandModule) => registerIfFree(kernel, seen, module);
-  register({ default: MakeCommand });
-  register({ default: BuildCommand });
-  register({ default: DoctorCommand });
-  register({ default: ConfigShowCommand });
-  register({ default: ConfigDiffCommand });
-  register({ default: InfoCommand });
-  register({ default: ConfigSetCommand });
-  register({ default: ConfigSourceCommand });
-  register({ default: ConfigValidateCommand });
-  register({
-    default: class extends DevCommand {
-      constructor() {
-        super(kernel);
-      }
-    },
-  });
-  register({ default: PluginsListCommand });
-  register({ default: PluginsUpdateCommand });
-  register({ default: PluginsWatchCommand });
-  register({ default: MigrateCommand });
-  register({ default: AuditCommand });
-  register({ default: CacheCommand });
-  register({ default: GraphCommand });
-  register({ default: AutocompleteCommand });
-  register({
-    default: class extends CompleteCommand {
-      constructor() {
-        super(kernel);
-      }
-    },
-  });
-  register({
-    default: class extends WatchCommand {
-      constructor() {
-        super(kernel);
-      }
-    },
-  });
-  register({ default: TutorialCommand });
-  register({ default: LspCommand });
-  register({ default: ReplayCommand });
-  register({ default: SandboxCommand });
-  register({ default: TestCommand });
-  register({ default: StorybookCommand });
-  register({ default: DeployCommand });
-  register({ default: DocsWidgetsCommand });
 }

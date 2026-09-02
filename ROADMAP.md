@@ -177,9 +177,7 @@ Built this session (newly committed), modularly per package:
 - Accessibility tree export (`--a11y-tree`) for CI checks ✅
 - Headless CI rendering mode (deterministic plain-text dumps) ✅
 - Plugin dependency graph visualization (`mudah doctor --deps`) ✅
-- Built-in `migrate` command pattern (up/down, version table) ✅
 - `--autocomplete` shell-integration: emit bash/zsh/fish completions to stdout ✅
-- `mudah audit` — check plugins for known vulnerabilities + deprecation notices ✅
 - `mudah cache` — manage `.mudah/cache/` (update-check cache, plugin cache) ✅
 - Provider lifecycle hooks: `onShutdown()`, `onError()`, `onConfigChanged()` ✅
 - `--trace` flag: log every event bus dispatch for debugging provider ordering ✅
@@ -203,20 +201,19 @@ Built this session (newly committed), modularly per package:
 - Terminal-native video playback (half-block + kitty graphics, audio via OS mixer) ✅
 - TUI widget layout debugger (overlay grid + live `tree()`) ✅
 - Language-server for Mudah apps (completion for `mudah.json`, command signatures) ✅
-- Web/WASI port of the pure widget layer (no shell I/O) ✅
+- Headless widget render (`@mudah-cli/tui/wasi`, alias `./headless`): text, JSON tree, HTML. No wasm32 binary yet. ✅
 - `mudah replay` — record and replay terminal sessions (script(1)-style but structured) ✅
-- `mudah sandbox` — run a command in a namespace-isolated FS + network sandbox ✅
 - Plugin hot-reload: watch `node_modules` for changes, re-import providers ✅
 - `mudah test` — built-in test runner that discovers `*.test.ts` files and runs vitest ✅
 - `mudah storybook` — interactive widget gallery with live resizing ✅
 - Declarative TUI DSL: YAML/JSON layout descriptions that compile to Component trees ✅
-- `mudah deploy` — built-in deployment orchestration (multi-host, rolling updates) ✅
 - `mudah watch` — generic file-watcher that re-runs commands on change (like `dev` but declarative) ✅
 
 ## Out of scope
 - An Ink / React layer
 - A 40-widget catalog
 - Screenshot docs as the source of truth
+- Built-in `deploy`, `sandbox`, `migrate`, or `audit` commands. Apps own those names.
 
 ## Agent loop
 

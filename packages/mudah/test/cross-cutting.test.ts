@@ -60,18 +60,6 @@ describe('cross-cutting built-ins', () => {
     expect(code).toBe(0);
   });
 
-  it('migrate up with an empty table exits 0', async () => {
-    const s = liveStreams();
-    const code = await run({ argv: ['migrate', 'up'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
-    expect(code).toBe(0);
-  });
-
-  it('audit exits 0', async () => {
-    const s = liveStreams();
-    const code = await run({ argv: ['audit'], cwd: appDir, stdout: s.stdout, stderr: s.stderr });
-    expect(code).toBe(0);
-  });
-
   it('--autocomplete bash contains complete', async () => {
     const s = liveStreams();
     const code = await run({

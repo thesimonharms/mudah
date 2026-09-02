@@ -124,7 +124,7 @@ describe('speculative TUI surfaces', () => {
   });
 
   it('renders a widget without process I/O', () => {
-    expect(renderWidgetToText(new Label('wasi-safe'))).toContain('wasi-safe');
+    expect(renderWidgetToText(new Label('headless'))).toContain('headless');
   });
 
   it('draws a layout debugger overlay', () => {
