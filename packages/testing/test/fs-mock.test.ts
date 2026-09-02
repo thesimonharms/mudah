@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { FsMock } from '@mudah-cli/testing';
+import { createRequire } from 'node:module';
+import { FsMock, mockFs } from '@mudah-cli/testing';
+
+const fs = createRequire(import.meta.url)('node:fs') as typeof import('node:fs');
 
 describe('FsMock', () => {
   it('writes and reads files', () => {
@@ -37,7 +40,20 @@ describe('FsMock', () => {
   });
 
   it('readdir on missing dir returns empty array', () => {
-    const fs = new FsMock();
-    expect(fs.readdir('/nope')).toEqual([]);
+    const fsMock = new FsMock();
+    expect(fsMock.readdir('/nope')).toEqual([]);
+  });
+
+  it('intercepts readFileSync and writeFileSync', () => {
+    const mock = new FsMock();
+    mock.write('/virtual.txt', 'from-mock');
+    const restore = mockFs(mock);
+    try {
+      expect(fs.readFileSync('/virtual.txt', 'utf8')).toBe('from-mock');
+      fs.writeFileSync('/written.txt', 'saved');
+      expect(mock.read('/written.txt')).toBe('saved');
+    } finally {
+      restore();
+    }
   });
 });

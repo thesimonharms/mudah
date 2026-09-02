@@ -1,4 +1,7 @@
-import { join, dirname, relative } from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const fs = require('node:fs') as typeof import('node:fs');
 
 interface FsNode {
   type: 'file' | 'dir';
@@ -120,7 +123,37 @@ export class FsMock {
  * ```
  */
 export function mockFs(mock: FsMock): () => void {
-  // Not used directly in this minimal implementation — FsMock is used
-  // via its own API. The intercept pattern can be added later if needed.
-  return () => {};
+  const previousRead = fs.readFileSync;
+  const previousWrite = fs.writeFileSync;
+  const previousExists = fs.existsSync;
+
+  fs.readFileSync = ((path: unknown, encoding?: unknown) => {
+    const key = String(path);
+    const text = mock.read(key) ?? mock.read(`/${key}`);
+    if (text === undefined) {
+      const err = new Error(`ENOENT: no such file or directory, open '${key}'`) as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    }
+    const enc =
+      encoding === 'utf8' ||
+      encoding === 'utf-8' ||
+      (typeof encoding === 'object' && encoding !== null && (encoding as { encoding?: string }).encoding === 'utf8');
+    return enc ? text : Buffer.from(text);
+  }) as typeof fs.readFileSync;
+
+  fs.writeFileSync = ((path: unknown, data: unknown) => {
+    mock.write(String(path), typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString('utf8'));
+  }) as typeof fs.writeFileSync;
+
+  fs.existsSync = ((path: unknown) => {
+    const key = String(path);
+    return mock.exists(key) || mock.exists(`/${key}`);
+  }) as typeof fs.existsSync;
+
+  return () => {
+    fs.readFileSync = previousRead;
+    fs.writeFileSync = previousWrite;
+    fs.existsSync = previousExists;
+  };
 }

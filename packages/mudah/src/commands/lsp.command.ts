@@ -1,5 +1,13 @@
 import { Command } from '@mudah-cli/console';
-import { decodeLspFrames, encodeLspFrame, handleLspMessage, initializeResult, type LspMessage } from '../lsp.js';
+import {
+  decodeLspFrames,
+  encodeLspFrame,
+  handleLspMessage,
+  initializeResult,
+  publishDiagnostics,
+  uriOf,
+  type LspMessage,
+} from '../lsp.js';
 
 /**
  * Built-in `lsp` command: stdio JSON-RPC (Content-Length framed, with a
@@ -41,6 +49,10 @@ export default class LspCommand extends Command {
           }
           const reply = handleLspMessage(msg);
           if (reply !== undefined) write(reply);
+          if (msg.method === 'textDocument/didOpen' || msg.method === 'textDocument/didChange') {
+            const notice = publishDiagnostics(uriOf(msg.params));
+            if (notice !== undefined) write(notice);
+          }
           if (msg.method === 'shutdown') {
             resolve(0);
           }

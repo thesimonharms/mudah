@@ -2,7 +2,17 @@
 export const keys = {
   list: { up: 'up', down: 'down', enter: 'select' },
   multi: { up: 'up', down: 'down', space: 'toggle', enter: 'submit' },
-  table: { up: 'up', down: 'down', enter: 'select', n: 'insert', d: 'delete', left: 'group', right: 'group' },
+  table: {
+    up: 'up',
+    down: 'down',
+    left: 'cell',
+    right: 'cell',
+    tab: 'cell',
+    enter: 'select',
+    insert: 'insert',
+    delete: 'delete',
+    backspace: 'edit',
+  },
   input: { enter: 'submit', 'left/right': 'caret' },
   viewport: { up: 'scroll', 'pgup/pgdn': 'page', home: 'top', end: 'bottom' },
   split: { drag: 'resize' },

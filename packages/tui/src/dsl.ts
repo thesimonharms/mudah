@@ -1,10 +1,10 @@
 import { Column, Row, Split } from './layout.js';
-import { Checkbox, Label, List, Panel, ProgressBar } from './widgets.js';
+import { Checkbox, Label, List, Panel, ProgressBar, Table, TextInput } from './widgets.js';
 import type { Component } from './component.js';
 
 /** JSON/YAML layout node compiled by {@link fromLayout}. */
 export interface LayoutNode {
-  type: 'column' | 'row' | 'split' | 'label' | 'list' | 'panel' | 'checkbox' | 'progress';
+  type: 'column' | 'row' | 'split' | 'label' | 'list' | 'panel' | 'checkbox' | 'progress' | 'table' | 'input';
   children?: LayoutNode[];
   text?: string;
   items?: string[];
@@ -13,6 +13,8 @@ export interface LayoutNode {
   value?: number;
   axis?: 'horizontal' | 'vertical';
   ratio?: number;
+  columns?: string[];
+  rows?: string[][];
 }
 
 const TYPES: ReadonlySet<string> = new Set([
@@ -24,6 +26,8 @@ const TYPES: ReadonlySet<string> = new Set([
   'panel',
   'checkbox',
   'progress',
+  'table',
+  'input',
 ]);
 
 export class LayoutSyntaxError extends Error {
@@ -40,7 +44,7 @@ export class LayoutSyntaxError extends Error {
  * Compile a declarative JSON layout into a Component tree.
  *
  * Supported types: `column`, `row`, `split`, `label`, `list`, `panel`,
- * `checkbox`, `progress`.
+ * `checkbox`, `progress`, `table`, `input`.
  */
 export function fromLayout(json: LayoutNode, path = '$'): Component {
   if (!TYPES.has(json.type)) {
@@ -75,6 +79,19 @@ export function fromLayout(json: LayoutNode, path = '$'): Component {
       return new Checkbox({ label: json.text ?? json.title ?? '', checked: json.checked });
     case 'progress':
       return new ProgressBar(json.value ?? 0);
+    case 'table': {
+      const headers = (json.columns ?? []).map((header) => ({ header }));
+      return new Table(headers.length > 0 ? headers : [{ header: 'col' }], json.rows ?? []);
+    }
+    case 'input': {
+      const input = new TextInput();
+      const initial = json.text ?? (json.value !== undefined ? String(json.value) : '');
+      if (initial.length > 0) {
+        input.value = initial;
+        input.cursor = initial.length;
+      }
+      return input;
+    }
     default: {
       throw new LayoutSyntaxError(`unknown type "${String((json as { type?: unknown }).type)}"`, path);
     }

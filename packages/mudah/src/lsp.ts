@@ -45,6 +45,7 @@ export function initializeResult(): {
     textDocumentSync: number;
     completionProvider: { triggerCharacters: string[] };
     hoverProvider: boolean;
+    diagnosticProvider: { interFileDependencies: boolean; workspaceDiagnostics: boolean };
   };
   serverInfo: { name: string; version: string };
 } {
@@ -53,12 +54,13 @@ export function initializeResult(): {
       textDocumentSync: 1,
       completionProvider: { triggerCharacters: ['"', '{', '-', '.'] },
       hoverProvider: true,
+      diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
     },
     serverInfo: { name: 'mudah-lsp', version: '0.8.0' },
   };
 }
 
-function uriOf(params: unknown): string {
+export function uriOf(params: unknown): string {
   if (typeof params !== 'object' || params === null) return '';
   const doc = (params as { textDocument?: { uri?: string } }).textDocument;
   return doc?.uri ?? '';
@@ -81,6 +83,94 @@ export function completionItems(params: unknown): CompletionItem[] {
     }));
   }
   return SIGNATURE_SNIPPETS;
+}
+
+export interface LspDiagnostic {
+  range: { start: { line: number; character: number }; end: { line: number; character: number } };
+  severity: 1 | 2 | 3 | 4;
+  source: 'mudah';
+  message: string;
+}
+
+const KNOWN_MANIFEST = new Set<string>(MANIFEST_KEYS.map((entry) => entry.label));
+
+function lineRange(line: number, character: number, length: number): LspDiagnostic['range'] {
+  return {
+    start: { line, character },
+    end: { line, character: character + Math.max(1, length) },
+  };
+}
+
+/** Schema diagnostics for an open `mudah.json` buffer. */
+export function mudahJsonDiagnostics(uri: string, text: string): LspDiagnostic[] {
+  if (!(uri.endsWith('mudah.json') || uri.includes('mudah.json'))) return [];
+  const out: LspDiagnostic[] = [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    out.push({
+      range: lineRange(0, 0, 1),
+      severity: 1,
+      source: 'mudah',
+      message: `mudah.json is not valid JSON (${message}).`,
+    });
+    return out;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    out.push({
+      range: lineRange(0, 0, 1),
+      severity: 1,
+      source: 'mudah',
+      message: 'mudah.json must contain a JSON object.',
+    });
+    return out;
+  }
+  const rec = parsed as Record<string, unknown>;
+  for (const key of ['name', 'version', 'bin'] as const) {
+    if (typeof rec[key] !== 'string' || rec[key].length === 0) {
+      out.push({
+        range: lineRange(0, 0, 1),
+        severity: 1,
+        source: 'mudah',
+        message: `mudah.json field "${key}" must be a non-empty string.`,
+      });
+    }
+  }
+  const lines = text.split('\n');
+  for (const key of Object.keys(rec)) {
+    if (KNOWN_MANIFEST.has(key)) continue;
+    let line = 0;
+    let character = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const at = (lines[i] ?? '').indexOf(`"${key}"`);
+      if (at >= 0) {
+        line = i;
+        character = at;
+        break;
+      }
+    }
+    out.push({
+      range: lineRange(line, character, key.length + 2),
+      severity: 2,
+      source: 'mudah',
+      message: `Unknown mudah.json key "${key}".`,
+    });
+  }
+  return out;
+}
+
+/** LSP notification for the current buffer, if it is a manifest. */
+export function publishDiagnostics(uri: string): LspMessage | undefined {
+  const text = documents.get(uri);
+  if (text === undefined) return undefined;
+  if (!(uri.endsWith('mudah.json') || uri.includes('mudah.json'))) return undefined;
+  return {
+    jsonrpc: '2.0',
+    method: 'textDocument/publishDiagnostics',
+    params: { uri, diagnostics: mudahJsonDiagnostics(uri, text) },
+  };
 }
 
 export function hoverContents(params: unknown): { kind: 'markdown'; value: string } | null {
@@ -107,6 +197,15 @@ export function handleLspMessage(msg: LspMessage): LspMessage | undefined {
     const text = textOf(msg.params);
     if (uri && text !== undefined) documents.set(uri, text);
     return undefined;
+  }
+  if (msg.method === 'textDocument/diagnostic') {
+    const uri = uriOf(msg.params);
+    const text = documents.get(uri) ?? '';
+    return {
+      jsonrpc: '2.0',
+      id: msg.id,
+      result: { kind: 'full', items: mudahJsonDiagnostics(uri, text) },
+    };
   }
   if (msg.method === 'textDocument/completion') {
     return { jsonrpc: '2.0', id: msg.id, result: completionItems(msg.params) };

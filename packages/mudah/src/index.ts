@@ -5,12 +5,27 @@ export {
   initializeResult,
   completionItems,
   hoverContents,
+  mudahJsonDiagnostics,
+  publishDiagnostics,
   encodeLspFrame,
   decodeLspFrames,
   type LspMessage,
+  type LspDiagnostic,
 } from './lsp.js';
 export { enterSandbox, withSandbox, type SandboxSession } from './sandbox.js';
-export { buildDeployPlan, executeDeployPlan, parseHosts, defaultSshProbe, validateHost, type DeployPlan, type HostProbe } from './deploy.js';
+export {
+  buildDeployPlan,
+  executeDeployPlan,
+  parseHosts,
+  defaultSshProbe,
+  defaultSshRun,
+  validateHost,
+  validateRemote,
+  type DeployPlan,
+  type HostProbe,
+  type HostRun,
+} from './deploy.js';
+export { fetchLatestVersion, applyPluginUpdate } from './commands/plugins.update.command.js';
 export { normalizeAutocompleteShell, renderAutocompleteScript, type AutocompleteShell } from './autocomplete.js';
 
 // App-facing re-exports: `import { Command } from '@mudah-cli/mudah'` is all users need.

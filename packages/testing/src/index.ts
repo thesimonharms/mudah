@@ -7,7 +7,8 @@ export {
   type TestTuiOptions,
 } from './test-tui.js';
 export { assertHasColor, assertLacksColor, type ColorExpectation } from './snapshot-assert.js';
-export { FsMock } from './fs-mock.js';
+export { FsMock, mockFs } from './fs-mock.js';
+export { NetworkMock, type NetworkMockResponse } from './network-mock.js';
 export { diffSnapshots, diffTrees } from './visual-diff.js';
 export {
   MockPluginRegistry,

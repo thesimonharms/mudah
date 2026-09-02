@@ -3,10 +3,12 @@ import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, withSandbox, buildDeployPlan, executeDeployPlan } from '@mudah-cli/mudah';
+import { createRequire } from 'node:module';
+import { handleLspMessage, encodeLspFrame, decodeLspFrames, run, watchPlugins, withSandbox, buildDeployPlan, executeDeployPlan, mudahJsonDiagnostics, applyPluginUpdate } from '@mudah-cli/mudah';
 
 const testDir = fileURLToPath(new URL('.', import.meta.url));
 const appDir = join(testDir, '.fixtures', 'speculative');
+const nodeFs = createRequire(import.meta.url)('node:fs') as typeof import('node:fs');
 
 function liveStreams(): {
   stdout: { write(data: string): void };
@@ -182,6 +184,7 @@ describe('built-in speculative commands', () => {
     expect(result.out).toContain('Label story');
     expect(result.out).toContain('List story');
     expect(result.out).toContain('Toolbar story');
+    expect(result.out).toContain('Table story');
   });
 
   it('migrate exits 0 with an empty set', async () => {
@@ -282,5 +285,57 @@ describe('production speculative helpers', () => {
     await withSandbox({ cwd: appDir }, () => {
       expect(process.env['NODE_OPTIONS']).toBeUndefined();
     });
+  });
+
+  it('blocks writes outside the sandbox cwd', async () => {
+    await withSandbox({ cwd: appDir }, () => {
+      nodeFs.writeFileSync(join(appDir, 'inside.txt'), 'ok');
+      expect(() => nodeFs.writeFileSync('/etc/mudah-sandbox-should-fail', 'no')).toThrow(/outside cwd/);
+    });
+  });
+
+  it('runs a remote command after a successful probe', async () => {
+    const plan = buildDeployPlan(['a.example', 'b.example'], true, false, 'systemctl restart app');
+    const ran: string[] = [];
+    const { results } = await executeDeployPlan(plan, {
+      probe: async () => ({ ok: true, latencyMs: 1, detail: 'probe' }),
+      run: async (host, command) => {
+        ran.push(`${host}:${command}`);
+        return { ok: true, latencyMs: 2, detail: 'run' };
+      },
+    });
+    expect(ran).toEqual(['a.example:systemctl restart app', 'b.example:systemctl restart app']);
+    expect(results.every((row) => row.ok)).toBe(true);
+  });
+
+  it('skips the remote command when the probe fails', async () => {
+    const plan = buildDeployPlan(['a.example'], false, false, 'true');
+    let ran = 0;
+    const { results } = await executeDeployPlan(plan, {
+      probe: async () => ({ ok: false, latencyMs: 1, detail: 'down' }),
+      run: async () => {
+        ran += 1;
+        return { ok: true, latencyMs: 0 };
+      },
+    });
+    expect(ran).toBe(0);
+    expect(results[0]?.ok).toBe(false);
+  });
+
+  it('flags unknown mudah.json keys', () => {
+    const items = mudahJsonDiagnostics(
+      'file:///app/mudah.json',
+      JSON.stringify({ name: 'demo', version: '1.0.0', bin: 'demo', nope: true }, null, 2),
+    );
+    expect(items.some((row) => row.message.includes('nope'))).toBe(true);
+  });
+
+  it('installs an outdated plugin via applyPluginUpdate', () => {
+    const result = applyPluginUpdate('demo-plugin', appDir, () => ({
+      status: 0,
+      stdout: 'added 1',
+      stderr: '',
+    }));
+    expect(result.ok).toBe(true);
   });
 });

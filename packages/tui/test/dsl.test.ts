@@ -13,6 +13,7 @@ import {
   Split,
   VideoFrames,
   VideoPlayer,
+  Table,
   compileLayout,
   fromLayout,
   parseLayout,
@@ -84,6 +85,9 @@ children:
     expect(compiled).toBeInstanceOf(Checkbox);
     expect(compileLayout({ type: 'progress', value: 1 })).toBeInstanceOf(ProgressBar);
     expect(compileLayout({ type: 'panel', title: 'box', text: 'hi' })).toBeInstanceOf(Panel);
+    const table = compileLayout({ type: 'table', columns: ['host'], rows: [['db']] });
+    expect(table).toBeInstanceOf(Table);
+    expect(compileLayout({ type: 'input', text: 'hello' }).render().join('\n')).toContain('hello');
   });
 });
 
@@ -197,6 +201,7 @@ describe('speculative TUI surfaces', () => {
   it('renders widgets to HTML for the web port', () => {
     const html = renderWidgetToHtml(new Label('Hello'));
     expect(html).toContain('<pre class="mudah-widget">');
+    expect(html).toContain('class="mudah-text"');
     expect(html).toContain('Hello');
   });
 });

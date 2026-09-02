@@ -178,6 +178,21 @@ describe('Screen.table', () => {
     screen.table.onKey({ name: 'd' });
     expect(screen.rows()).toHaveLength(2);
   });
+
+  it('edits the selected cell and moves between columns', () => {
+    const screen = Screen.table({
+      title: 'Hosts',
+      columns: [{ header: 'Host' }, { header: 'State' }],
+      rows: [['db', 'up']],
+    });
+    TestTui.mount(screen.root, { cols: 60, rows: 12 });
+    screen.table.onKey({ name: 'x', ch: 'x' });
+    expect(screen.rows()[0]?.[0]).toBe('dbx');
+    screen.table.onKey({ name: 'right' });
+    screen.table.onKey({ name: 'backspace' });
+    screen.table.onKey({ name: 'n', ch: 'n' });
+    expect(screen.rows()[0]).toEqual(['dbx', 'un']);
+  });
 });
 
 describe('Overlay', () => {

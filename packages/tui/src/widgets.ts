@@ -14,6 +14,8 @@ export interface TableColumnDef {
 export class Table extends BaseComponent {
   private rows: string[][];
   selectedIndex = 0;
+  /** Column currently being edited. */
+  selectedColumn = 0;
   /** Rows visible at once; defaults to every row plus the header. */
   viewportHeight?: number;
 
@@ -88,7 +90,18 @@ export class Table extends BaseComponent {
   }
 
   inspect(): { role: string; name?: string; value?: unknown } {
-    return { role: 'table', name: this.selected?.[0], value: this.selectedIndex };
+    return {
+      role: 'table',
+      name: this.selected?.[this.selectedColumn] ?? this.selected?.[0],
+      value: { row: this.selectedIndex, column: this.selectedColumn },
+    };
+  }
+
+  private clampColumn(): void {
+    this.selectedColumn = Math.min(
+      Math.max(this.selectedColumn, 0),
+      Math.max(0, this.columns.length - 1),
+    );
   }
 
   insertRow(row?: string[]): number {
@@ -122,9 +135,12 @@ export class Table extends BaseComponent {
     const rendered = renderTable(
       this.columns.map((column) => ({ header: column.header, align: column.align })),
       visible.map((row, i) => {
-        const marker = start + i === this.selectedIndex ? '▸' : ' ';
-        const [first = '', ...rest] = row;
-        return [`${marker} ${first}`, ...rest];
+        const isRow = start + i === this.selectedIndex;
+        return row.map((cell, c) => {
+          const marked = isRow && c === this.selectedColumn ? `[${cell}]` : cell;
+          if (c === 0) return `${isRow ? '▸' : ' '} ${marked}`;
+          return marked;
+        });
       }),
       { level: 0, unicode: true },
     );
@@ -132,36 +148,79 @@ export class Table extends BaseComponent {
   }
 
   readonly focusable = true;
-  readonly keys = { up: 'up', down: 'down', enter: 'select', n: 'insert', d: 'delete' };
+  readonly keys = {
+    up: 'up',
+    down: 'down',
+    left: 'cell',
+    right: 'cell',
+    tab: 'cell',
+    enter: 'select',
+    insert: 'insert',
+    delete: 'delete',
+    backspace: 'edit',
+  };
 
   override onKey(event: KeyEvent): boolean {
-    switch (event.name) {
-      case 'up':
-        this.move(-1);
-        return true;
-      case 'down':
-        this.move(1);
-        return true;
-      case 'enter':
-        this.confirm();
-        return true;
-      case 'n':
-        this.insertRow();
-        return true;
-      case 'd':
-      case 'delete':
-        this.deleteRow();
-        return true;
-      default:
-        if (event.ch !== undefined && event.ch >= ' ' && event.name.length === 1) {
-          const row = this.rows[this.selectedIndex];
-          if (row) {
-            row[0] = `${row[0] ?? ''}${event.ch}`;
-            return true;
-          }
-        }
-        return false;
+    if (event.name === 'up') {
+      this.move(-1);
+      return true;
     }
+    if (event.name === 'down') {
+      this.move(1);
+      return true;
+    }
+    if (event.name === 'left') {
+      this.selectedColumn -= 1;
+      this.clampColumn();
+      return true;
+    }
+    if (event.name === 'right') {
+      this.selectedColumn += 1;
+      this.clampColumn();
+      return true;
+    }
+    if (event.name === 'tab') {
+      if (this.columns.length === 0) return true;
+      this.selectedColumn = (this.selectedColumn + 1) % this.columns.length;
+      return true;
+    }
+    if (event.name === 'shift-tab') {
+      if (this.columns.length === 0) return true;
+      this.selectedColumn = (this.selectedColumn - 1 + this.columns.length) % this.columns.length;
+      return true;
+    }
+    if (event.name === 'enter') {
+      this.confirm();
+      return true;
+    }
+    if (event.name === 'insert' || event.name === 'ctrl+n' || (event.name === 'n' && (event.ctrl === true || event.ch === undefined))) {
+      this.insertRow();
+      return true;
+    }
+    if (
+      event.name === 'delete' ||
+      event.name === 'ctrl+d' ||
+      (event.name === 'd' && (event.ctrl === true || event.ch === undefined))
+    ) {
+      this.deleteRow();
+      return true;
+    }
+    if (event.name === 'backspace') {
+      const row = this.rows[this.selectedIndex];
+      if (!row) return true;
+      this.clampColumn();
+      const current = row[this.selectedColumn] ?? '';
+      this.updateCell(this.selectedColumn, current.slice(0, -1));
+      return true;
+    }
+    if (event.ch !== undefined && event.ch >= ' ' && event.name.length === 1 && event.ctrl !== true) {
+      const row = this.rows[this.selectedIndex];
+      if (!row) return false;
+      this.clampColumn();
+      this.updateCell(this.selectedColumn, `${row[this.selectedColumn] ?? ''}${event.ch}`);
+      return true;
+    }
+    return false;
   }
 
   override onMouse(event: MouseEvent): boolean {

@@ -9,10 +9,16 @@ export interface DeployPlan {
   readonly mode: 'rolling' | 'all-at-once';
   readonly hosts: DeployHost[];
   readonly dryRun: boolean;
+  /** Remote command run over SSH after a successful probe. */
+  readonly remote?: string;
 }
 
 export interface HostProbe {
   (host: string): Promise<{ ok: boolean; latencyMs: number; detail?: string }>;
+}
+
+export interface HostRun {
+  (host: string, command: string): Promise<{ ok: boolean; latencyMs: number; detail?: string }>;
 }
 
 export interface DeployResult {
@@ -21,11 +27,23 @@ export interface DeployResult {
 }
 
 const HOST_RE = /^[A-Za-z0-9.:\[\]_-]+$/;
+const REMOTE_RE = /^[\w./:=@+, \t'"%*-]+$/;
 
 export function validateHost(host: string): string {
   const trimmed = host.trim();
   if (trimmed.length === 0 || !HOST_RE.test(trimmed) || trimmed.includes('..')) {
     throw new Error(`[deploy] Invalid host "${host}".`);
+  }
+  return trimmed;
+}
+
+/** Reject empty remote strings and shell metacharacters that are not needed for a restart/rsync command. */
+export function validateRemote(command: string): string {
+  const trimmed = command.trim();
+  if (trimmed.length === 0) throw new Error('[deploy] Remote command is empty.');
+  if (trimmed.length > 512) throw new Error('[deploy] Remote command is too long.');
+  if (!REMOTE_RE.test(trimmed)) {
+    throw new Error('[deploy] Remote command has characters that are not allowed.');
   }
   return trimmed;
 }
@@ -39,23 +57,27 @@ export function parseHosts(raw: string | undefined): string[] {
   return parsed.length > 0 ? parsed : ['localhost'];
 }
 
-export function buildDeployPlan(hosts: readonly string[], rolling: boolean, dryRun = true): DeployPlan {
+export function buildDeployPlan(
+  hosts: readonly string[],
+  rolling: boolean,
+  dryRun = true,
+  remote?: string,
+): DeployPlan {
   return {
     mode: rolling ? 'rolling' : 'all-at-once',
     dryRun,
+    ...(remote !== undefined ? { remote: validateRemote(remote) } : {}),
     hosts: hosts.map((host, i) => ({ host: validateHost(host), wave: rolling ? i + 1 : 1 })),
   };
 }
 
-/** SSH BatchMode probe. Injectable for tests via `executeDeployPlan`. */
-export async function defaultSshProbe(host: string): Promise<{ ok: boolean; latencyMs: number; detail?: string }> {
-  const safe = validateHost(host);
+const SSH_BASE = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=accept-new'] as const;
+
+function sshResult(
+  args: readonly string[],
+): { ok: boolean; latencyMs: number; detail?: string } {
   const started = Date.now();
-  const result = spawnSync(
-    'ssh',
-    ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=accept-new', safe, 'true'],
-    { encoding: 'utf8', timeout: 8_000 },
-  );
+  const result = spawnSync('ssh', [...args], { encoding: 'utf8', timeout: 8_000 });
   const latencyMs = Date.now() - started;
   if (result.error) {
     return { ok: false, latencyMs, detail: result.error.message };
@@ -67,11 +89,34 @@ export async function defaultSshProbe(host: string): Promise<{ ok: boolean; late
   return { ok: true, latencyMs, detail: 'ssh' };
 }
 
-export async function executeDeployPlan(plan: DeployPlan, probe?: HostProbe): Promise<DeployResult> {
+/** SSH BatchMode probe. Injectable for tests via `executeDeployPlan`. */
+export async function defaultSshProbe(host: string): Promise<{ ok: boolean; latencyMs: number; detail?: string }> {
+  const safe = validateHost(host);
+  const probed = sshResult([...SSH_BASE, safe, 'true']);
+  return { ...probed, detail: probed.ok ? 'ssh probe' : probed.detail };
+}
+
+/** Run `command` on `host` with SSH BatchMode. */
+export async function defaultSshRun(host: string, command: string): Promise<{ ok: boolean; latencyMs: number; detail?: string }> {
+  const safe = validateHost(host);
+  const remote = validateRemote(command);
+  const ran = sshResult([...SSH_BASE, safe, '--', remote]);
+  return { ...ran, detail: ran.ok ? `ssh ${remote}` : ran.detail };
+}
+
+export interface ExecuteDeployOptions {
+  probe?: HostProbe;
+  run?: HostRun;
+}
+
+export async function executeDeployPlan(plan: DeployPlan, options?: HostProbe | ExecuteDeployOptions): Promise<DeployResult> {
+  const probe: HostProbe | undefined = typeof options === 'function' ? options : options?.probe;
+  const run: HostRun | undefined = typeof options === 'function' ? undefined : options?.run;
   const results: DeployResult['results'] = [];
   if (plan.dryRun) {
     for (const entry of plan.hosts) {
-      results.push({ host: entry.host, ok: true, latencyMs: 0, detail: 'dry-run' });
+      const detail = plan.remote ? `dry-run ${plan.remote}` : 'dry-run';
+      results.push({ host: entry.host, ok: true, latencyMs: 0, detail });
     }
     return { plan, results };
   }
@@ -80,20 +125,30 @@ export async function executeDeployPlan(plan: DeployPlan, probe?: HostProbe): Pr
     throw new Error('[deploy] --execute requires a host probe (bind deploy.probe or use the default SSH probe).');
   }
 
+  const visit = async (host: string): Promise<DeployResult['results'][number]> => {
+    const probed = await probe(host);
+    if (!probed.ok || plan.remote === undefined) {
+      return { host, ...probed };
+    }
+    const exec = run ?? defaultSshRun;
+    const ran = await exec(host, plan.remote);
+    return {
+      host,
+      ok: ran.ok,
+      latencyMs: probed.latencyMs + ran.latencyMs,
+      detail: `${probed.detail ?? 'probe'}; ${ran.detail ?? 'run'}`,
+    };
+  };
+
   if (plan.mode === 'all-at-once') {
-    const batch = await Promise.all(
-      plan.hosts.map(async (entry) => {
-        const probed = await probe(entry.host);
-        return { host: entry.host, ...probed };
-      }),
-    );
+    const batch = await Promise.all(plan.hosts.map((entry) => visit(entry.host)));
     return { plan, results: batch };
   }
 
   for (const entry of plan.hosts) {
-    const probed = await probe(entry.host);
-    results.push({ host: entry.host, ...probed });
-    if (!probed.ok) break;
+    const row = await visit(entry.host);
+    results.push(row);
+    if (!row.ok) break;
   }
   return { plan, results };
 }

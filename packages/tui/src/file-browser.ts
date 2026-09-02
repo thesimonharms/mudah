@@ -77,7 +77,7 @@ export class FileBrowser extends BaseComponent {
   private visible(): FileEntry[] {
     const q = this.query.toLowerCase();
     if (q.length === 0) return this.entries;
-    return this.entries.filter((entry) => entry.path.toLowerCase().includes(q) || entry.name.toLowerCase().includes(q));
+    return this.entries.filter((entry) => fuzzySubsequence(q, entry.path) || fuzzySubsequence(q, entry.name));
   }
 
   render(): string[] {
@@ -152,4 +152,15 @@ export class FileBrowser extends BaseComponent {
     const max = Math.max(0, this.visible().length - 1);
     this.selectedIndex = Math.min(this.selectedIndex, max);
   }
+}
+
+/** True when every query character appears in order in `text`. */
+function fuzzySubsequence(query: string, text: string): boolean {
+  const hay = text.toLowerCase();
+  let i = 0;
+  for (const ch of hay) {
+    if (ch === query[i]) i += 1;
+    if (i >= query.length) return true;
+  }
+  return false;
 }

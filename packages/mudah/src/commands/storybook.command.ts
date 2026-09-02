@@ -1,11 +1,16 @@
 import { Command } from '@mudah-cli/console';
 import { TestTui } from '@mudah-cli/testing';
 import {
+  Calendar,
+  Chart,
   Checkbox,
   Column,
+  DatePicker,
   Label,
   List,
+  Pager,
   ProgressBar,
+  Table,
   Toolbar,
   type Layout,
 } from '@mudah-cli/tui';
@@ -40,6 +45,21 @@ export default class StorybookCommand extends Command {
       ),
       story('checkbox', new Column().add(new Label('Checkbox story'), new Checkbox({ label: 'enabled', checked: true })), cols, rows),
       story('progress', new Column().add(new Label('Progress story'), new ProgressBar(0.42)), cols, rows),
+      story(
+        'table',
+        new Column().add(new Label('Table story'), new Table([{ header: 'Host' }, { header: 'State' }], [['db', 'up']])),
+        cols,
+        rows,
+      ),
+      story('pager', new Column().add(new Pager({ title: 'Pager story', lines: ['alpha', 'beta', 'gamma'] })), cols, rows),
+      story('calendar', new Column().add(new Label('Calendar story'), new Calendar({ date: new Date('2026-09-01T00:00:00Z') })), cols, Math.max(rows, 10)),
+      story('datepicker', new Column().add(new Label('DatePicker story'), new DatePicker({ date: new Date('2026-09-01T00:00:00Z') })), cols, Math.max(rows, 10)),
+      story(
+        'chart',
+        new Column().add(new Label('Chart story'), new Chart({ kind: 'bar', entries: [{ label: 'a', value: 3 }, { label: 'b', value: 1 }] })),
+        cols,
+        rows,
+      ),
     ];
 
     const shown = filter ? stories.filter((entry) => entry.name === filter) : stories;
